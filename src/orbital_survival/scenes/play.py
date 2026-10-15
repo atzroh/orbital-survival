@@ -19,6 +19,12 @@ class PlayScene(Scene):
     """
 
     def __init__(self, screen: pygame.Surface, graph: GraphWindow | None) -> None:
+        """Start a fresh round.
+
+        Args:
+            screen: The game window's surface.
+            graph: Telemetry graph to feed, or None.
+        """
         super().__init__(screen)
 
         self.graph = graph
@@ -52,18 +58,24 @@ class PlayScene(Scene):
             self.graph.attach(self.recorder)
 
     def handle_event(self, event: pygame.event.Event) -> SceneRequest | None:
-        """Play mode never switches away in response to an event."""
+        """Play mode never switches away in response to an event.
+
+        Args:
+            event: Event to handle.
+
+        Returns:
+            Always None.
+        """
         return None
 
     def update(self) -> SceneRequest | None:
         """Poll keyboard and mouse, then step the logic one frame.
 
-        Input is polled rather than event-driven so that holding a key or a
-        button keeps accelerating, instead of nudging once per key repeat.
+        Input is polled so that holding a key or button keeps accelerating.
 
-        Returns a switch to the game-over screen on the frame the last life
-        is spent, carrying the tally with it — this scene is discarded
-        immediately afterwards, so nothing else can report those numbers.
+        Returns:
+            A switch to GAME_OVER with the tally once the last life is spent,
+            otherwise None.
         """
         keys = pygame.key.get_pressed()
         mouse_buttons = pygame.mouse.get_pressed()

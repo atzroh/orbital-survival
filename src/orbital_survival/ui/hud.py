@@ -18,14 +18,20 @@ MARGIN = 10
 LINE_GAP = 5
 
 HEART = "♥"
-# Past this many lives a row of hearts stops being readable at a glance, so
-# the row collapses to a count instead. The choice keys off MAX_LIVES rather
-# than the current life total, so the format never changes mid-round.
+# Above this MAX_LIVES, show a count instead of a row of hearts. Keyed off
+# MAX_LIVES so the format never changes mid-round.
 MAX_HEARTS_SHOWN = 5
 
 
 def lives_text(lives: int) -> str:
-    """Render the remaining lives as hearts, or as a count if there are many."""
+    """Render the remaining lives as hearts, or as a count if there are many.
+
+    Args:
+        lives: Remaining lives; negative values count as 0.
+
+    Returns:
+        The text to display.
+    """
     remaining = max(0, lives)
     if MAX_LIVES <= MAX_HEARTS_SHOWN:
         return " ".join([HEART] * remaining)
@@ -49,11 +55,21 @@ class HUD:
     """
 
     def __init__(self, font_size: int = 30) -> None:
+        """Load the HUD font.
+
+        Args:
+            font_size: Font size of every line.
+        """
         self.font = pygame.font.SysFont(FONT_NAMES, font_size)
         self.color = WHITE
 
     def draw(self, screen: pygame.Surface, state: HUDState) -> None:
-        """Draw the HUD, stacking time/score/lives left and speed/accel right."""
+        """Draw the HUD, stacking time/score/lives left and speed/accel right.
+
+        Args:
+            screen: Surface to draw on.
+            state: Values to display.
+        """
         display_speed = state.planet_speed * DISPLAY_SCALE
         speed_text = self.font.render(f"SPEED:{display_speed:+08.4f}", True, GREEN)
         speed_rect = speed_text.get_rect(topright=(SCREEN_WIDTH - MARGIN, MARGIN))

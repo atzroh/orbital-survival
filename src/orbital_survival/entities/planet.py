@@ -31,6 +31,14 @@ class Planet(CelestialBody):
         angle: float,
         orbit_radius: float,
     ) -> None:
+        """Set up a planet at rest on its orbit.
+
+        Args:
+            center_pos: Center of the orbit.
+            size: Radius of the planet.
+            angle: Initial angle in radians.
+            orbit_radius: Radius of the orbit.
+        """
         super().__init__(
             center_pos=center_pos,
             size=size,
@@ -48,7 +56,14 @@ class Planet(CelestialBody):
         self.x, self.y = self._orbit_point(self.angle)
 
     def _orbit_point(self, angle: float) -> tuple[float, float]:
-        """Return the point on the orbit at the given angle."""
+        """Return the point on the orbit at the given angle.
+
+        Args:
+            angle: Angle in radians.
+
+        Returns:
+            The (x, y) screen position.
+        """
         return (
             self.center_pos[0] + self.orbit_radius * math.cos(angle),
             self.center_pos[1] + self.orbit_radius * math.sin(angle),
@@ -57,7 +72,8 @@ class Planet(CelestialBody):
     def update(self, direction: int) -> None:
         """Apply one frame of input, then move along the orbit.
 
-        `direction` is -1 for left, 0 for none, 1 for right.
+        Args:
+            direction: -1 for left, 0 for none, 1 for right.
         """
         speed_before_update = self.speed
 
@@ -68,12 +84,20 @@ class Planet(CelestialBody):
         self.x, self.y = self._orbit_point(self.angle)
 
     def draw(self, screen: pygame.Surface) -> None:
-        """Draw the trail first so the planet body sits on top of it."""
+        """Draw the trail first so the planet body sits on top of it.
+
+        Args:
+            screen: Surface to draw on.
+        """
         self._draw_trajectory(screen)
         self._draw_planet(screen)
 
     def _draw_planet(self, screen: pygame.Surface) -> None:
-        """Draw the planet as a black disc with a colored outline."""
+        """Draw the planet as a black disc with a colored outline.
+
+        Args:
+            screen: Surface to draw on.
+        """
         pygame.draw.circle(screen, BLACK, (int(self.x), int(self.y)), self.size)
         pygame.draw.circle(
             screen, self.color, (int(self.x), int(self.y)), self.size, CIRCLE_WIDTH
@@ -82,8 +106,10 @@ class Planet(CelestialBody):
     def _draw_trajectory(self, screen: pygame.Surface) -> None:
         """Trail the planet with circles that shrink and darken behind it.
 
-        The trail lags proportionally to the current speed, so it stretches
-        out under acceleration and collapses to nothing when stationary.
+        The trail length is proportional to the current speed.
+
+        Args:
+            screen: Surface to draw on.
         """
         for n in range(self.TRAJECTORY_NUM):
             progress = n / self.TRAJECTORY_NUM

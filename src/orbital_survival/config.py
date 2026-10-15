@@ -1,8 +1,4 @@
-"""Tuning constants for rendering, physics and gameplay.
-
-Also home to the Color type and the one operation performed on colors, so
-the palette and the code that manipulates it stay together.
-"""
+"""Tuning constants for rendering, physics and gameplay, plus color helpers."""
 
 import math
 from typing import Final
@@ -31,24 +27,19 @@ BUTTON_RADIUS: Final[int] = 30
 # Monospaced font candidates, tried in order. A constant digit width keeps
 # the HUD from jittering as values change.
 FONT_NAMES: Final[list[str]] = ["consolas", "dejavusansmono", "couriernew", "monospace"]
-# Angular values are tiny fractions of a radian; scaling them makes a readout
-# move visibly instead of sitting at 0.0000. Shared so that the HUD and the
-# telemetry graph never disagree about what a speed of "99" means.
+# Scales tiny angular values into readable numbers; shared by the HUD and the
+# graph so they always agree.
 DISPLAY_SCALE: Final[int] = 1000
 
 # --- Telemetry-graph parameters ---
 
-# The graph lives in its own window, opened only with `--graph`. Matching the
-# game window rather than fixing a size keeps the two side by side at the same
-# scale, and makes the plot track a change to SCREEN_SIZE.
+# Same size as the game window, so the two sit side by side at the same scale.
 GRAPH_WIDTH: Final[int] = SCREEN_WIDTH
 GRAPH_HEIGHT: Final[int] = SCREEN_HEIGHT
 # Frames of history kept and plotted. The samples are stretched across the
 # plot area whatever this is, so raising it costs no screen space.
 GRAPH_HISTORY_FRAMES: Final[int] = FPS * 5
-# Frames between repaints. Recording still happens every frame, so this only
-# trades graph smoothness for the cost of rebuilding the plot; 1 repaints as
-# often as the game itself.
+# Frames between repaints; recording still happens every frame.
 GRAPH_DRAW_INTERVAL: Final[int] = 4
 
 # --- Game-system-related parameters ---
@@ -82,6 +73,14 @@ MAX_BEAMS: Final[int] = 39
 
 
 def scale_color(color: Color, ratio: float) -> Color:
-    """Scale a color toward black, for fade-out effects."""
+    """Scale a color toward black, for fade-out effects.
+
+    Args:
+        color: Color to scale.
+        ratio: Brightness factor, 0 for black and 1 for unchanged.
+
+    Returns:
+        The scaled color.
+    """
     red, green, blue = color
     return int(red * ratio), int(green * ratio), int(blue * ratio)

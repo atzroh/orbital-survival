@@ -1,7 +1,6 @@
 """Game rules: physics stepping, collision resolution and scoring.
 
-This layer deliberately imports no pygame drawing code, so it can be run
-headless — which is what makes the golden-master test possible.
+Imports no pygame drawing code, so it can run headless.
 """
 
 import math
@@ -37,9 +36,8 @@ class Logic:
         self.left_active = False
         self.right_active = False
 
-        # The direction that last reached the planet, kept so the telemetry
-        # graph can plot what the physics actually saw rather than the raw
-        # button states, which disagree whenever both are held.
+        # The direction the planet last received, for the graph; it differs
+        # from the buttons when both are held.
         self.direction = 0
 
         self.corpses: list[BeamCorpse] = []
@@ -77,17 +75,7 @@ class Logic:
     def _check_collisions(self) -> None:
         """Resolve planet-beam collisions and update the score.
 
-        A beam and the planet meet when the expanding arc overlaps the orbit
-        radially *and* the two overlap angularly. The angular test adds a
-        margin of asin(planet_size / orbit_radius), the half-angle the planet
-        subtends from the center, so the planet is treated as a disc rather
-        than as a point.
-
-        The angular difference is a *sum*, `planet.angle + beam.angle`, not a
-        subtraction. pygame.draw.arc takes counter-clockwise mathematical
-        angles while the screen Y axis points down, so an arc drawn at theta
-        appears where the planet's frame calls -theta. Adding the two angles
-        is what cancels that flip.
+        Angles are summed, not subtracted, to cancel the flipped Y axis of pygame arcs.
         """
         planet_angle = self.planet.angle
         planet_orbit_radius = self.planet.orbit_radius

@@ -29,6 +29,12 @@ class GameOverScene(Scene):
     """
 
     def __init__(self, screen: pygame.Surface, result: GameResult) -> None:
+        """Load the fonts and keep the round's result.
+
+        Args:
+            screen: The game window's surface.
+            result: Tally of the round that just ended.
+        """
         super().__init__(screen)
 
         self.result = result
@@ -37,11 +43,22 @@ class GameOverScene(Scene):
         self.prompt_font = pygame.font.SysFont(FONT_NAMES, PROMPT_FONT_SIZE)
 
     def handle_event(self, event: pygame.event.Event) -> SceneRequest | None:
-        """Return to the title when SPACE is pressed."""
+        """Return to the title when SPACE is pressed.
+
+        Args:
+            event: Event to handle.
+
+        Returns:
+            A switch to START, or None to stay.
+        """
         return SceneRequest(GameMode.START) if is_start_pressed(event) else None
 
     def update(self) -> SceneRequest | None:
-        """The game-over screen is static; nothing to advance."""
+        """The game-over screen is static; nothing to advance.
+
+        Returns:
+            Always None.
+        """
         return None
 
     def draw(self) -> None:

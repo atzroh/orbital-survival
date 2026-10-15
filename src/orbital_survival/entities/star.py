@@ -26,6 +26,12 @@ class Star(CelestialBody):
     """
 
     def __init__(self, center_pos: Position, size: float) -> None:
+        """Set up a star with a random initial angle and spin.
+
+        Args:
+            center_pos: Center of the star.
+            size: Radius of the cannons.
+        """
         super().__init__(
             center_pos=center_pos,
             size=size,
@@ -92,11 +98,22 @@ class Star(CelestialBody):
         self.update_angle_and_speed(self.random_direction)
 
     def _cannon_angle(self, index: int) -> float:
-        """Angle of the given cannon, spaced evenly around the current phase."""
+        """Angle of the given cannon, spaced evenly around the current phase.
+
+        Args:
+            index: Cannon index, from 0 to CANNON_COUNT - 1.
+
+        Returns:
+            The cannon's angle in radians.
+        """
         return self.angle + (2 * math.pi / CANNON_COUNT) * index
 
     def draw(self, screen: pygame.Surface) -> None:
-        """Draw the beams, then the star body, then the cannons on top."""
+        """Draw the beams, then the star body, then the cannons on top.
+
+        Args:
+            screen: Surface to draw on.
+        """
         for beam in self.beams:
             beam.draw(screen)
 

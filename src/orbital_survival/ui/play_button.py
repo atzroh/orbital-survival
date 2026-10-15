@@ -25,6 +25,14 @@ class PlayButton:
         radius: int,
         direction: Direction,
     ) -> None:
+        """Pre-render the normal and active images.
+
+        Args:
+            center_x: X coordinate of the center.
+            center_y: Y coordinate of the center.
+            radius: Radius of the button.
+            direction: Which way the arrow points.
+        """
         self.center = (center_x, center_y)
         self.radius = radius
         self.direction = direction
@@ -36,7 +44,15 @@ class PlayButton:
         self.rect = self.image_normal.get_rect(center=self.center)
 
     def _create_surface(self, icon_color: Color, bg_color: Color) -> pygame.Surface:
-        """Render one button state onto a transparent surface."""
+        """Render one button state onto a transparent surface.
+
+        Args:
+            icon_color: Color of the arrow.
+            bg_color: Color of the disc behind it.
+
+        Returns:
+            The rendered image.
+        """
         surface = pygame.Surface((self.radius * 2, self.radius * 2), pygame.SRCALPHA)
 
         pygame.draw.circle(surface, bg_color, (self.radius, self.radius), self.radius)
@@ -66,15 +82,25 @@ class PlayButton:
         return surface
 
     def draw(self, screen: pygame.Surface, is_active: bool = False) -> None:
-        """Blit the pressed or unpressed image depending on `is_active`."""
+        """Blit the pressed or unpressed image depending on `is_active`.
+
+        Args:
+            screen: Surface to draw on.
+            is_active: Whether the button is pressed.
+        """
         image = self.image_active if is_active else self.image_normal
         screen.blit(image, self.rect)
 
     def is_clicked(self, pos: Position) -> bool:
         """Return whether a point falls inside the button's circle.
 
-        The circle is tested directly rather than via self.rect, which is the
-        square bounding box and would accept the corners.
+        Tests the circle, not self.rect, so the corners do not count.
+
+        Args:
+            pos: Point to test.
+
+        Returns:
+            True if the point is inside the circle.
         """
         return (
             math.hypot(pos[0] - self.center[0], pos[1] - self.center[1]) <= self.radius

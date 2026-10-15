@@ -1,13 +1,6 @@
 """A separate window plotting speed, acceleration and input over time.
 
-Opened only with `--graph`. The window is a second SDL window rather than a
-panel inside the game, so the plot can be as wide as it needs to be without
-stealing room from the playfield.
-
-The plot is composed on an ordinary `pygame.Surface` with the same drawing
-calls as the rest of the UI, then uploaded as a texture — `pygame.Window` has
-no surface of its own to draw into, so a renderer is the only way onto a
-second window.
+Drawn on a Surface and uploaded as a texture, since a second Window has no surface.
 """
 
 from collections import deque
@@ -41,10 +34,8 @@ MARGIN = 10
 LABEL_FONT_SIZE = 18
 LABEL_INSET = 4  # Offset of the label from its pane's top-left corner
 
-# One frame changes the speed by `a * direction * friction - speed * (1 -
-# friction)`. Both terms peak at ACCELERATION * FRICTION -- the second because
-# MAX_SPEED is itself ACCELERATION * FRICTION / (1 - FRICTION) -- so the
-# largest step is twice that, reached when the player reverses at full speed.
+# Largest per-frame speed change: reversing at MAX_SPEED, where both the input
+# and the friction terms reach ACCELERATION * FRICTION.
 MAX_ACCELERATION = 2 * ACCELERATION * FRICTION
 
 
@@ -69,9 +60,8 @@ class Pane:
     value_format: str
 
 
-# Fixed rather than auto-scaled: every bound below follows from the tuning
-# constants, so the axes track a change to ACCELERATION or FRICTION on their
-# own, and a stationary baseline keeps "how fast is fast" readable at a glance.
+# Fixed rather than auto-scaled; the bounds follow from the tuning constants,
+# so the axes stay stable and readable at a glance.
 PANES = (
     Pane(
         label="SPEED",
@@ -100,19 +90,33 @@ PANES = (
 class GraphRecorder:
     """The rolling history of one round, oldest sample first.
 
-    Owned by the play scene, so a new round starts from an empty history
-    without anyone having to remember to clear it.
+    Owned by the play scene, so each round starts empty.
     """
 
     def __init__(self, history_frames: int = GRAPH_HISTORY_FRAMES) -> None:
+        """Start an empty history.
+
+        Args:
+            history_frames: Number of most recent frames to keep.
+        """
         self.samples: deque[Sample] = deque(maxlen=history_frames)
 
     def record(self, speed: float, acceleration: float, direction: int) -> None:
-        """Append one frame, dropping the oldest once the window is full."""
+        """Append one frame, dropping the oldest once the window is full.
+
+        Args:
+            speed: Planet speed.
+            acceleration: Per-frame change in speed.
+            direction: Input direction the planet received.
+        """
         self.samples.append(Sample(speed, acceleration, direction))
 
     def series(self) -> tuple[list[float], ...]:
-        """Return the three series in `PANES` order, ready to plot."""
+        """Return the three series in `PANES` order, ready to plot.
+
+        Returns:
+            Speed, acceleration and direction lists, oldest first.
+        """
         return (
             [sample.speed for sample in self.samples],
             [sample.acceleration for sample in self.samples],
@@ -123,9 +127,7 @@ class GraphRecorder:
 class GraphWindow:
     """The second window, and the plot drawn into it.
 
-    It holds the recorder rather than the scene that owns it, so that a round
-    ending does not blank the graph: the last round's recorder stays attached
-    until the next one replaces it.
+    Holds the last round's recorder, so the graph stays up between rounds.
     """
 
     def __init__(self) -> None:
@@ -144,22 +146,17 @@ class GraphWindow:
     def place_beside_game(self) -> None:
         """Sit beside the game window, and hand the keyboard back to it.
 
-        This window is created after the game's, so left alone it opens on top
-        of it holding the focus, and the arrow keys do nothing until the player
-        thinks to click the game window first.
+        Otherwise this window opens on top holding the focus, ignoring arrow keys.
         """
         game_window = Window.from_display_module()
 
-        # This window was created a moment ago and the window manager has not
-        # placed it yet. Setting a position before it does is silently undone
-        # -- measurably: without this pump the graph lands 60px below the game
-        # every single time -- so let SDL take delivery of that placement first.
+        # Let the window manager place the new window first; a position set
+        # before that is silently undone.
         pygame.event.pump()
 
         desktop_width, desktop_height = pygame.display.get_desktop_sizes()[0]
-        # Only arranged when both windows fit side by side. On a narrower
-        # desktop a computed position would push one of them off-screen, so
-        # there the OS keeps its own placement and the player drags them.
+        # Only arranged when both fit side by side; otherwise the OS placement
+        # is kept so neither ends up off-screen.
         if desktop_width >= SCREEN_WIDTH + GRAPH_WIDTH:
             left = (desktop_width - SCREEN_WIDTH - GRAPH_WIDTH) // 2
             top = max(0, (desktop_height - SCREEN_HEIGHT) // 2)
@@ -169,11 +166,22 @@ class GraphWindow:
         game_window.focus()
 
     def attach(self, recorder: GraphRecorder) -> None:
-        """Plot this recorder from now on."""
+        """Plot this recorder from now on.
+
+        Args:
+            recorder: History of the current round.
+        """
         self.recorder = recorder
 
     def owns(self, window: Window | None) -> bool:
-        """Return whether a window event came from this window."""
+        """Return whether a window event came from this window.
+
+        Args:
+            window: Window the event came from, or None.
+
+        Returns:
+            True if it is this window.
+        """
         return window is self.window
 
     def close(self) -> None:
@@ -203,7 +211,14 @@ class GraphWindow:
             self._draw_pane(pane, list(values), self._pane_rect(index))
 
     def _pane_rect(self, index: int) -> pygame.Rect:
-        """Return the plot area of the index-th pane, counting from the top."""
+        """Return the plot area of the index-th pane, counting from the top.
+
+        Args:
+            index: Pane index, from the top.
+
+        Returns:
+            The pane's plot area.
+        """
         # One margin above each pane plus one below the last.
         height = (GRAPH_HEIGHT - MARGIN * (len(PANES) + 1)) // len(PANES)
         return pygame.Rect(
@@ -214,7 +229,13 @@ class GraphWindow:
         )
 
     def _draw_pane(self, pane: Pane, values: list[float], rect: pygame.Rect) -> None:
-        """Draw one pane: its zero line, its trace, then its label."""
+        """Draw one pane: its zero line, its trace, then its label.
+
+        Args:
+            pane: How to label, scale and color the series.
+            values: Raw samples, oldest first.
+            rect: Plot area of the pane.
+        """
         pygame.draw.line(
             self.surface, GRAY, (rect.left, rect.centery), (rect.right, rect.centery)
         )
@@ -238,17 +259,28 @@ class GraphWindow:
     def _x(self, index: int, count: int, rect: pygame.Rect) -> float:
         """Map a sample's position in the history onto the pane's width.
 
-        The whole history is stretched across the pane, so changing
-        GRAPH_HISTORY_FRAMES rescales time rather than resizing the window.
+        Args:
+            index: Sample position, oldest first.
+            count: Number of samples; at least 2.
+            rect: Plot area of the pane.
+
+        Returns:
+            Screen x coordinate.
         """
         return rect.left + index * (rect.width - 1) / (count - 1)
 
     def _y(self, value: float, pane: Pane, rect: pygame.Rect) -> float:
         """Map a value onto the pane's height, clamped to its bounds.
 
-        Clamping matters because MAX_SPEED is only approached asymptotically
-        from below but ACCEL can sit exactly on its bound, and a rounding
-        error there would draw a pixel outside the pane.
+        Clamping keeps rounding error at the ACCEL bound inside the pane.
+
+        Args:
+            value: Raw sample value.
+            pane: Pane giving the scale and range.
+            rect: Plot area of the pane.
+
+        Returns:
+            Screen y coordinate.
         """
         offset = value * pane.scale / pane.value_range * (rect.height / 2)
         return rect.centery - max(-rect.height / 2, min(rect.height / 2, offset))

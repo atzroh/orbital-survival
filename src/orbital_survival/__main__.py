@@ -6,7 +6,11 @@ from orbital_survival.game import Game
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse the command line."""
+    """Parse the command line.
+
+    Returns:
+        The parsed arguments.
+    """
     parser = argparse.ArgumentParser(
         prog="orbital-survival",
         description="A 2D space survival game: orbit your planet and dodge beams.",

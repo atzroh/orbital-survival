@@ -31,6 +31,15 @@ class Beam(BaseArc):
         radius: float,
         width: int,
     ) -> None:
+        """Set up a beam leaving the star.
+
+        Args:
+            center_pos: Center of the star.
+            angle: Direction of the beam in radians.
+            arc_range: Angular width of the beam.
+            radius: Starting radius.
+            width: Stroke width.
+        """
         super().__init__(
             center_pos=center_pos,
             angle=angle,
@@ -47,11 +56,19 @@ class Beam(BaseArc):
         self.radius += self.SPEED
 
     def is_alive(self) -> bool:
-        """A beam lives until it expands past the edge of the play area."""
+        """A beam lives until it expands past the edge of the play area.
+
+        Returns:
+            True while the beam is inside the play area.
+        """
         return self.radius < self.MAX_RADIUS
 
     def draw(self, screen: pygame.Surface) -> None:
-        """Draw the beam, fading it out over the stretch past the orbit."""
+        """Draw the beam, fading it out over the stretch past the orbit.
+
+        Args:
+            screen: Surface to draw on.
+        """
         fade_distance = self.MAX_RADIUS - PLANET_ORBIT_RADIUS
 
         fade_progress = (
@@ -83,6 +100,15 @@ class BeamCorpse(BaseArc):
         radius: float,
         width: int,
     ) -> None:
+        """Set up a corpse where a beam struck.
+
+        Args:
+            center_pos: Center of the star.
+            angle: Direction of the struck beam in radians.
+            arc_range: Angular width of the struck beam.
+            radius: Radius at which the beam struck.
+            width: Stroke width.
+        """
         super().__init__(
             center_pos=center_pos,
             angle=angle,
@@ -98,11 +124,19 @@ class BeamCorpse(BaseArc):
         self.life -= 1
 
     def is_alive(self) -> bool:
-        """Return whether the corpse still has display time left."""
+        """Return whether the corpse still has display time left.
+
+        Returns:
+            True while display time remains.
+        """
         return self.life > 0
 
     def draw(self, screen: pygame.Surface) -> None:
-        """Draw the corpse, dimming it as its remaining life runs out."""
+        """Draw the corpse, dimming it as its remaining life runs out.
+
+        Args:
+            screen: Surface to draw on.
+        """
         if self.is_alive():
             life_ratio = self.life / self.DURATION
             self.draw_arc(screen, scale_color(self.color, life_ratio), self.width)

@@ -27,10 +27,7 @@ class GameResult:
 class SceneRequest:
     """A scene's request to switch, carrying whatever the next scene needs.
 
-    The payload rides along with the mode because the scene that has the
-    numbers — the one that just ended — is thrown away the moment the switch
-    happens. Handing them to `Game` keeps scenes from having to know one
-    another.
+    The payload rides along because the requesting scene is discarded on switch.
     """
 
     mode: GameMode
@@ -43,24 +40,32 @@ class Scene(ABC):
     """
 
     def __init__(self, screen: pygame.Surface) -> None:
+        """Bind the scene to the surface it draws on.
+
+        Args:
+            screen: The game window's surface.
+        """
         self.screen = screen
 
     @abstractmethod
     def handle_event(self, event: pygame.event.Event) -> SceneRequest | None:
         """Handle one event, returning a switch request, or None to stay.
 
-        Scenes name a mode rather than returning the next scene so that they
-        never import one another — which is what would turn the
-        play -> game over -> start cycle into a circular import.
+        Naming a mode rather than a scene avoids circular imports between scenes.
+
+        Args:
+            event: Event to handle.
+
+        Returns:
+            A switch request, or None to stay.
         """
 
     @abstractmethod
     def update(self) -> SceneRequest | None:
         """Advance the scene one frame, optionally requesting a switch.
 
-        Play requests the game-over screen from here rather than from
-        `handle_event`: running out of lives follows from the simulation, not
-        from anything the player pressed.
+        Returns:
+            A switch request, or None to stay.
         """
 
     @abstractmethod

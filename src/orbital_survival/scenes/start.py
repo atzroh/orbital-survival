@@ -18,7 +18,14 @@ PROMPT_GAP = 30  # Gap between the title's baseline and the prompt
 
 
 def is_start_pressed(event: pygame.event.Event) -> bool:
-    """Return True when the event is a SPACE key press."""
+    """Return True when the event is a SPACE key press.
+
+    Args:
+        event: Event to inspect.
+
+    Returns:
+        True for a SPACE key press.
+    """
     return event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE
 
 
@@ -28,17 +35,33 @@ class StartScene(Scene):
     """
 
     def __init__(self, screen: pygame.Surface) -> None:
+        """Load the title screen's fonts.
+
+        Args:
+            screen: The game window's surface.
+        """
         super().__init__(screen)
 
         self.title_font = pygame.font.SysFont(FONT_NAMES, TITLE_FONT_SIZE)
         self.prompt_font = pygame.font.SysFont(FONT_NAMES, PROMPT_FONT_SIZE)
 
     def handle_event(self, event: pygame.event.Event) -> SceneRequest | None:
-        """Switch to PLAY when SPACE is pressed."""
+        """Switch to PLAY when SPACE is pressed.
+
+        Args:
+            event: Event to handle.
+
+        Returns:
+            A switch to PLAY, or None to stay.
+        """
         return SceneRequest(GameMode.PLAY) if is_start_pressed(event) else None
 
     def update(self) -> SceneRequest | None:
-        """The title screen is static; nothing to advance."""
+        """The title screen is static; nothing to advance.
+
+        Returns:
+            Always None.
+        """
         return None
 
     def draw(self) -> None:

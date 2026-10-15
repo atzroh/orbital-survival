@@ -31,6 +31,16 @@ class CelestialBody:
         angle: float,
         speed: float,
     ) -> None:
+        """Set up a body orbiting `center_pos`.
+
+        Args:
+            center_pos: Center of rotation.
+            size: Radius of the body.
+            acceleration: Speed added per frame of input.
+            friction: Factor the speed is multiplied by each frame.
+            angle: Initial angle in radians.
+            speed: Initial angular speed.
+        """
         self.center_pos = center_pos
         self.size = size
         self.angle = angle % (2 * math.pi)
@@ -39,7 +49,11 @@ class CelestialBody:
         self.friction = friction
 
     def update_angle_and_speed(self, direction: int) -> None:
-        """Accelerate in `direction`, apply friction, keep the angle in [0, 2pi)."""
+        """Accelerate in `direction`, apply friction, keep the angle in [0, 2pi).
+
+        Args:
+            direction: -1, 0 or 1; the sign of the acceleration.
+        """
         self.speed += self.acceleration * direction
         self.speed *= self.friction
         self.angle += self.speed
@@ -58,6 +72,16 @@ class BaseArc(ABC):
         width: int,
         color: Color,
     ) -> None:
+        """Set up an arc centered on `center_pos`.
+
+        Args:
+            center_pos: Center of the arc's circle.
+            angle: Angle of the arc's midpoint in radians.
+            arc_range: Angular width of the arc.
+            radius: Radius of the arc.
+            width: Stroke width.
+            color: Base color.
+        """
         self.center_pos = center_pos
         self.angle = angle % (2 * math.pi)
         self.arc_range = arc_range
@@ -71,10 +95,20 @@ class BaseArc(ABC):
 
     @abstractmethod
     def is_alive(self) -> bool:
-        """Return whether this object should still be simulated and drawn."""
+        """Return whether this object should still be simulated and drawn.
+
+        Returns:
+            True while the object is alive.
+        """
 
     def draw_arc(self, screen: pygame.Surface, color: Color, draw_width: int) -> None:
-        """Draw the arc, skipping zero-width strokes that pygame would reject."""
+        """Draw the arc, skipping zero-width strokes that pygame would reject.
+
+        Args:
+            screen: Surface to draw on.
+            color: Color to draw with.
+            draw_width: Stroke width.
+        """
         if draw_width > 0:
             start_angle = self.angle - self.arc_range / 2
             end_angle = self.angle + self.arc_range / 2

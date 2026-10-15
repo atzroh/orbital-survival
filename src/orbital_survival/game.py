@@ -40,14 +40,18 @@ class Game:
     """
 
     def __init__(self, show_graph: bool = False) -> None:
+        """Open the game window, and the graph window if asked.
+
+        Args:
+            show_graph: Whether to open the telemetry graph window.
+        """
         pygame.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
         pygame.display.set_caption("ORBITAL SURVIVAL")
 
-        # Opened once and reused by every round, so the graph does not blink
-        # in and out of existence each time the player dies. None once the
-        # player closes it, or when --graph was never passed.
+        # Shared by every round so it does not blink on death. None when closed
+        # or without --graph.
         self.graph = GraphWindow() if show_graph else None
         if self.graph is not None:
             self.graph.place_beside_game()
@@ -60,8 +64,13 @@ class Game:
     def _create_scene(self, request: SceneRequest) -> Scene:
         """Build the scene the request names, handing over its payload.
 
-        Owning construction here is what lets scenes stay unaware of each
-        other: they only name the mode they want to switch to.
+        Building scenes here keeps them from having to know one another.
+
+        Args:
+            request: The mode to switch to, and its payload.
+
+        Returns:
+            The new scene.
         """
         match request.mode:
             case GameMode.START:
@@ -69,14 +78,20 @@ class Game:
             case GameMode.PLAY:
                 return PlayScene(self.screen, self.graph)
             case GameMode.GAME_OVER:
-                # Asking for the game-over screen without a tally to show
-                # is a caller bug, so let it fail loudly rather than
-                # inventing a score of zero.
+                # A missing tally is a caller bug; fail loudly rather than
+                # show a score of zero.
                 assert request.result is not None
                 return GameOverScene(self.screen, request.result)
 
     def _create_stars(self, num_stars: int) -> list[BackgroundStar]:
-        """Scatter the starfield once at startup; it never moves afterwards."""
+        """Scatter the starfield once at startup; it never moves afterwards.
+
+        Args:
+            num_stars: Number of stars to place.
+
+        Returns:
+            The background stars.
+        """
         stars = []
         for _ in range(num_stars):
             # Draw order matters: these share the global random stream with
@@ -111,10 +126,13 @@ class Game:
     def _is_graph_close(self, event: pygame.event.Event) -> bool:
         """Return whether this event is the graph window being closed.
 
-        SDL reports the close of a secondary window as WINDOWCLOSE carrying
-        the window it came from, and reserves QUIT for the display window --
-        but only the `event.window` check keeps a stray QUIT from the graph
-        window out of the branch below that ends the game.
+        Checking `event.window` keeps a graph close from ending the game.
+
+        Args:
+            event: Event to inspect.
+
+        Returns:
+            True if the graph window is being closed.
         """
         if self.graph is None:
             return False
