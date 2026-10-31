@@ -35,16 +35,16 @@ uv sync
 ## Run
 
 ```bash
-uv run orbital-survival           # play
-uv run orbital-survival --graph   # play, with the telemetry graph
+uv run orbital-survival         # play
+uv run orbital-survival --graph # play, with the telemetry graph
 ```
 
 ## Development
 
 ```bash
-uv run mypy                # type check (strict)
-uv run ruff check --fix    # lint
-uv run ruff format         # format
+uv run mypy             # type check (strict)
+uv run ruff check --fix # lint
+uv run ruff format      # format
 ```
 
 ## Controls
@@ -88,11 +88,11 @@ The two differ when both arrows are down, which resolves to left.
 
 Three constants in `config.py` control it:
 
-| Constant | Meaning |
-| --- | --- |
-| `GRAPH_HISTORY_FRAMES` | Frames kept and plotted. The history is stretched across a fixed-width window, so raising it buys more time rather than a wider window. |
-| `GRAPH_DRAW_INTERVAL` | Frames between repaints. Sampling always happens every frame, so this trades only smoothness for cost. |
-| `GRAPH_WIDTH` / `GRAPH_HEIGHT` | Size of the graph window, tracking `SCREEN_WIDTH` / `SCREEN_HEIGHT` so it stays the size of the game window. |
+| Constant                       | Meaning                                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `GRAPH_HISTORY_FRAMES`         | Frames kept and plotted. The history is stretched across a fixed-width window, so raising it buys more time rather than a wider window. |
+| `GRAPH_DRAW_INTERVAL`          | Frames between repaints. Sampling always happens every frame, so this trades only smoothness for cost.                                  |
+| `GRAPH_WIDTH` / `GRAPH_HEIGHT` | Size of the graph window, tracking `SCREEN_WIDTH` / `SCREEN_HEIGHT` so it stays the size of the game window.                            |
 
 Closing the graph window leaves the game running; it stays closed until the
 next launch. The graph holds its last picture between rounds, so the run that
