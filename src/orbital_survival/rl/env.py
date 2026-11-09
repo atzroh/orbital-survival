@@ -10,16 +10,16 @@ import numpy.typing as npt
 import pygame
 
 from orbital_survival.config import (
-    BEAM_MAX_RADIUS,
     BLACK,
     FPS,
-    MAX_BEAMS,
     MAX_LIVES,
     PLANET_ORBIT_RADIUS,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
+    STAR_SIZE,
 )
 from orbital_survival.entities.base import CelestialBody
+from orbital_survival.entities.star import CANNON_COUNT, DECISION_INTERVAL
 from orbital_survival.logic import Logic
 from orbital_survival.ui.hud import HUD, HUDState
 
@@ -35,10 +35,13 @@ SURVIVAL_REWARD: Final[float] = 0.01  # Per frame survived
 HIT_PENALTY: Final[float] = 1.0  # Per life lost
 MAX_EPISODE_FRAMES: Final[int] = FPS * 120  # Cut off runs at two minutes
 
-PLANET_FEATURES: Final[int] = 4  # sin, cos, speed, lives
-STAR_FEATURES: Final[int] = 3  # sin, cos, speed
-BEAM_FEATURES: Final[int] = 4  # present, radial offset, sin, cos
-OBS_SIZE: Final[int] = PLANET_FEATURES + STAR_FEATURES + MAX_BEAMS * BEAM_FEATURES
+PLANET_FEATURES: Final[int] = 2  # speed, lives
+# speed, spin direction, time to next fire roll, then sin/cos per cannon
+STAR_FEATURES: Final[int] = 3 + 2 * CANNON_COUNT
+BEAM_FEATURES: Final[int] = 4  # present, distance to orbit, sin, cos
+# Incoming beams kept; rarely more than this are on their way at once.
+BEAM_SLOTS: Final[int] = 16
+OBS_SIZE: Final[int] = PLANET_FEATURES + STAR_FEATURES + BEAM_SLOTS * BEAM_FEATURES
 
 
 class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
@@ -173,26 +176,38 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         star = self.logic.star
         obs = np.zeros(OBS_SIZE, dtype=np.float32)
 
-        star_angle = planet.angle + star.angle
-        obs[:7] = (
-            math.sin(planet.angle),
-            math.cos(planet.angle),
+        # Everything is relative to the planet; the game looks the same at
+        # any absolute angle.
+        cannons = []
+        for i in range(CANNON_COUNT):
+            cannon_angle = planet.angle + star.angle + 2 * math.pi * i / CANNON_COUNT
+            cannons += [math.sin(cannon_angle), math.cos(cannon_angle)]
+        obs[: PLANET_FEATURES + STAR_FEATURES] = (
             planet.speed / CelestialBody.MAX_SPEED,
             self.logic.lives / MAX_LIVES,
-            math.sin(star_angle),
-            math.cos(star_angle),
             star.speed / CelestialBody.MAX_SPEED,
+            star.random_direction,
+            (DECISION_INTERVAL - star.beam_timer) / DECISION_INTERVAL,
+            *cannons,
         )
 
-        # Nearest to the orbit first; beams beyond MAX_BEAMS are dropped.
-        beams = sorted(star.beams, key=lambda b: abs(b.radius - PLANET_ORBIT_RADIUS))
+        # Only beams that can still hit, the first to arrive first. The
+        # back-edge test matches the band in Logic._check_collisions.
+        incoming = [
+            beam
+            for beam in star.beams
+            if beam.radius - beam.width - planet.size < PLANET_ORBIT_RADIUS
+        ]
+        incoming.sort(key=lambda b: b.radius, reverse=True)
         offset = PLANET_FEATURES + STAR_FEATURES
-        for i, beam in enumerate(beams[:MAX_BEAMS]):
+        for i, beam in enumerate(incoming[:BEAM_SLOTS]):
             beam_angle = planet.angle + beam.angle
             start = offset + i * BEAM_FEATURES
             obs[start : start + BEAM_FEATURES] = (
                 1.0,
-                (beam.radius - PLANET_ORBIT_RADIUS) / BEAM_MAX_RADIUS,
+                # 1 as it leaves the star, 0 at the orbit, slightly negative
+                # while it crosses.
+                (PLANET_ORBIT_RADIUS - beam.radius) / (PLANET_ORBIT_RADIUS - STAR_SIZE),
                 math.sin(beam_angle),
                 math.cos(beam_angle),
             )

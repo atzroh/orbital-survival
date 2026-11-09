@@ -19,6 +19,9 @@ Follow-ups for the reinforcement-learning work (`src/orbital_survival/rl/`).
 - [ ] Compare reward designs (e.g. game score, distance-to-beam shaping) and
       `FRAME_SKIP` values.
 - [ ] Compare PPO with DQN.
+- [ ] Ablate the v2 observation changes (incoming-only beams, all three
+      cannons, no absolute angle, fire timer and spin direction) to see which
+      ones actually help.
 
 ## Learning
 
