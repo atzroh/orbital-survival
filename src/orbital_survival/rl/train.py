@@ -43,6 +43,19 @@ def parse_args() -> argparse.Namespace:
         default=500_000,
         help="also save a snapshot every this many steps, next to --out",
     )
+    parser.add_argument(
+        "--net-arch",
+        type=int,
+        nargs="+",
+        default=[64, 64],
+        help="hidden layer sizes of a new model; ignored with --resume",
+    )
+    parser.add_argument(
+        "--learning-rate",
+        type=float,
+        default=3e-4,
+        help="learning rate of a new model; ignored with --resume",
+    )
     return parser.parse_args()
 
 
@@ -55,7 +68,14 @@ def main() -> None:
     env = make_vec_env(OrbitalSurvivalEnv, n_envs=NUM_ENVS)
     # A small MLP trains faster on the CPU than on a GPU.
     if args.resume is None:
-        model = PPO("MlpPolicy", env, verbose=1, device="cpu")
+        model = PPO(
+            "MlpPolicy",
+            env,
+            learning_rate=args.learning_rate,
+            policy_kwargs={"net_arch": args.net_arch},
+            verbose=1,
+            device="cpu",
+        )
     else:
         model = PPO.load(args.resume, env=env, device="cpu")
     out = Path(args.out)
