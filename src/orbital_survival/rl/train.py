@@ -61,6 +61,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="decay the learning rate linearly to 0 over training",
     )
+    parser.add_argument(
+        "--gamma",
+        type=float,
+        default=0.99,
+        help="discount factor of a new model; ignored with --resume",
+    )
     return parser.parse_args()
 
 
@@ -91,6 +97,7 @@ def main() -> None:
             "MlpPolicy",
             env,
             learning_rate=learning_rate,
+            gamma=args.gamma,
             policy_kwargs={"net_arch": args.net_arch},
             verbose=1,
             device="cpu",
