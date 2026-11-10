@@ -32,9 +32,9 @@ python_version = "3.12"
 strict = true
 files = ["src"]
 
-# CI installs only the dev group; SB3 (and torch) live in the rl group.
+# CI installs only the dev group; SB3 and torch live in the rl group.
 [[tool.mypy.overrides]]
-module = ["stable_baselines3", "stable_baselines3.*"]
+module = ["stable_baselines3", "stable_baselines3.*", "torch", "torch.*"]
 ignore_missing_imports = true
 
 [tool.ruff]

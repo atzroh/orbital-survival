@@ -6,6 +6,7 @@ Run with `uv run --group rl python -m orbital_survival.rl.train`.
 import argparse
 from pathlib import Path
 
+import torch
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.env_checker import check_env
@@ -67,12 +68,25 @@ def parse_args() -> argparse.Namespace:
         default=0.99,
         help="discount factor of a new model; ignored with --resume",
     )
+    parser.add_argument(
+        "--n-steps",
+        type=int,
+        default=2048,
+        help="steps per env between updates of a new model; ignored with --resume",
+    )
+    parser.add_argument(
+        "--torch-threads",
+        type=int,
+        default=1,
+        help="CPU threads for PyTorch; more threads only contend with the games",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     """Check the environment, train PPO, and save the model."""
     args = parse_args()
+    torch.set_num_threads(args.torch_threads)
 
     check_env(OrbitalSurvivalEnv())
 
@@ -98,6 +112,7 @@ def main() -> None:
             env,
             learning_rate=learning_rate,
             gamma=args.gamma,
+            n_steps=args.n_steps,
             policy_kwargs={"net_arch": args.net_arch},
             verbose=1,
             device="cpu",
