@@ -56,6 +56,11 @@ def parse_args() -> argparse.Namespace:
         default=3e-4,
         help="learning rate of a new model; ignored with --resume",
     )
+    parser.add_argument(
+        "--linear-lr",
+        action="store_true",
+        help="decay the learning rate linearly to 0 over training",
+    )
     return parser.parse_args()
 
 
@@ -66,12 +71,26 @@ def main() -> None:
     check_env(OrbitalSurvivalEnv())
 
     env = make_vec_env(OrbitalSurvivalEnv, n_envs=NUM_ENVS)
+    initial_lr: float = args.learning_rate
+
+    def linear_lr(progress: float) -> float:
+        """Scale the learning rate by the remaining progress.
+
+        Args:
+            progress: Remaining progress, from 1 down to 0, given by SB3.
+
+        Returns:
+            The learning rate for the next update.
+        """
+        return initial_lr * progress
+
+    learning_rate = linear_lr if args.linear_lr else initial_lr
     # A small MLP trains faster on the CPU than on a GPU.
     if args.resume is None:
         model = PPO(
             "MlpPolicy",
             env,
-            learning_rate=args.learning_rate,
+            learning_rate=learning_rate,
             policy_kwargs={"net_arch": args.net_arch},
             verbose=1,
             device="cpu",
