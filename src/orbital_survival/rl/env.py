@@ -52,17 +52,23 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
 
     metadata: dict[str, Any] = {"render_modes": ["human"], "render_fps": FPS}  # noqa: RUF012
 
-    def __init__(self, render_mode: str | None = None) -> None:
+    def __init__(
+        self,
+        render_mode: str | None = None,
+        max_episode_frames: int = MAX_EPISODE_FRAMES,
+    ) -> None:
         """Define the action and observation spaces; the game starts on reset.
 
         Args:
             render_mode: "human" to show the game in a window, or None.
+            max_episode_frames: Frames after which a round is cut off.
         """
         self.action_space = gym.spaces.Discrete(3)
         self.observation_space = gym.spaces.Box(
             low=-1.0, high=1.0, shape=(OBS_SIZE,), dtype=np.float32
         )
         self.render_mode = render_mode
+        self.max_episode_frames = max_episode_frames
         self.logic = Logic()
         self.frames = 0
 
@@ -124,7 +130,7 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
                 break
 
         terminated = self.logic.is_game_over
-        truncated = not terminated and self.frames >= MAX_EPISODE_FRAMES
+        truncated = not terminated and self.frames >= self.max_episode_frames
         return self._observe(), reward, terminated, truncated, self._info()
 
     def render(self) -> None:
