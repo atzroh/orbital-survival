@@ -12,7 +12,8 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 
-from orbital_survival.rl.env import OrbitalSurvivalEnv
+from orbital_survival.config import FPS
+from orbital_survival.rl.env import MAX_EPISODE_FRAMES, OrbitalSurvivalEnv
 
 NUM_ENVS = 4  # Rounds played in parallel to gather experience
 
@@ -81,6 +82,24 @@ def parse_args() -> argparse.Namespace:
         help="minibatch size of a new model; ignored with --resume",
     )
     parser.add_argument(
+        "--n-epochs",
+        type=int,
+        default=10,
+        help="passes over each batch of experience; ignored with --resume",
+    )
+    parser.add_argument(
+        "--ent-coef",
+        type=float,
+        default=0.0,
+        help="entropy bonus that keeps actions random; ignored with --resume",
+    )
+    parser.add_argument(
+        "--max-seconds",
+        type=int,
+        default=MAX_EPISODE_FRAMES // FPS,
+        help="cut off each training round after this many seconds",
+    )
+    parser.add_argument(
         "--torch-threads",
         type=int,
         default=1,
@@ -96,7 +115,11 @@ def main() -> None:
 
     check_env(OrbitalSurvivalEnv())
 
-    env = make_vec_env(OrbitalSurvivalEnv, n_envs=NUM_ENVS)
+    env = make_vec_env(
+        OrbitalSurvivalEnv,
+        n_envs=NUM_ENVS,
+        env_kwargs={"max_episode_frames": args.max_seconds * FPS},
+    )
     initial_lr: float = args.learning_rate
 
     def linear_lr(progress: float) -> float:
@@ -120,6 +143,8 @@ def main() -> None:
             gamma=args.gamma,
             n_steps=args.n_steps,
             batch_size=args.batch_size,
+            n_epochs=args.n_epochs,
+            ent_coef=args.ent_coef,
             policy_kwargs={"net_arch": args.net_arch},
             verbose=1,
             device="cpu",
