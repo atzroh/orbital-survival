@@ -75,6 +75,12 @@ def parse_args() -> argparse.Namespace:
         help="steps per env between updates of a new model; ignored with --resume",
     )
     parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=64,
+        help="minibatch size of a new model; ignored with --resume",
+    )
+    parser.add_argument(
         "--torch-threads",
         type=int,
         default=1,
@@ -113,6 +119,7 @@ def main() -> None:
             learning_rate=learning_rate,
             gamma=args.gamma,
             n_steps=args.n_steps,
+            batch_size=args.batch_size,
             policy_kwargs={"net_arch": args.net_arch},
             verbose=1,
             device="cpu",
