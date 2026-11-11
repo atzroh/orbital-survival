@@ -19,6 +19,8 @@ from orbital_survival.rl.env import (
 
 type Policy = Callable[[Observation], np.int64]
 
+SHORT_SECONDS = 60  # Rounds lost before this are the ones to get rid of
+
 
 def parse_args() -> argparse.Namespace:
     """Parse the command line.
@@ -104,6 +106,12 @@ def main() -> None:
     print("policy  score (mean/min/max)  survival s (mean/min/max)")
     print_row("model", model_results)
     print_row("random", random_results)
+    short = [
+        str(seed) for seed, (_, sec) in enumerate(model_results) if sec < SHORT_SECONDS
+    ]
+    print(
+        f"model rounds under {SHORT_SECONDS} s: {len(short)} (seeds {' '.join(short)})"
+    )
 
 
 if __name__ == "__main__":
