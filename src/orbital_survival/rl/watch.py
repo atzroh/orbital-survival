@@ -28,6 +28,11 @@ def parse_args() -> argparse.Namespace:
         default=MAX_EPISODE_FRAMES // FPS,
         help="cut off each round after this many seconds",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        help="replay this seeded round, as in evaluate, again and again",
+    )
     return parser.parse_args()
 
 
@@ -43,7 +48,7 @@ def main() -> None:
     round_no = 0
     while not env.quit_requested:
         round_no += 1
-        obs, info = env.reset()
+        obs, info = env.reset(seed=args.seed)
         done = False
         while not done and not env.quit_requested:
             action = np.int64(model.predict(obs, deterministic=True)[0])
