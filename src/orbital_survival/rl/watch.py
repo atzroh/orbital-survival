@@ -9,7 +9,7 @@ import numpy as np
 from stable_baselines3 import PPO
 
 from orbital_survival.config import FPS
-from orbital_survival.rl.env import OrbitalSurvivalEnv
+from orbital_survival.rl.env import MAX_EPISODE_FRAMES, OrbitalSurvivalEnv
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,6 +22,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model", default="models/ppo_orbital", help="saved model (.zip optional)"
     )
+    parser.add_argument(
+        "--max-seconds",
+        type=int,
+        default=MAX_EPISODE_FRAMES // FPS,
+        help="cut off each round after this many seconds",
+    )
     return parser.parse_args()
 
 
@@ -30,7 +36,9 @@ def main() -> None:
     args = parse_args()
 
     model = PPO.load(args.model, device="cpu")
-    env = OrbitalSurvivalEnv(render_mode="human")
+    env = OrbitalSurvivalEnv(
+        render_mode="human", max_episode_frames=args.max_seconds * FPS
+    )
 
     round_no = 0
     while not env.quit_requested:
