@@ -100,6 +100,12 @@ def parse_args() -> argparse.Namespace:
         help="cut off each training round after this many seconds",
     )
     parser.add_argument(
+        "--near-miss-penalty",
+        type=float,
+        default=0.0,
+        help="penalty per frame for each beam that only just misses the planet",
+    )
+    parser.add_argument(
         "--torch-threads",
         type=int,
         default=1,
@@ -118,7 +124,10 @@ def main() -> None:
     env = make_vec_env(
         OrbitalSurvivalEnv,
         n_envs=NUM_ENVS,
-        env_kwargs={"max_episode_frames": args.max_seconds * FPS},
+        env_kwargs={
+            "max_episode_frames": args.max_seconds * FPS,
+            "near_miss_penalty": args.near_miss_penalty,
+        },
     )
     initial_lr: float = args.learning_rate
 

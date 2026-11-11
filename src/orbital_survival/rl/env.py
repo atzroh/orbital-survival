@@ -33,6 +33,8 @@ RIGHT: Final[int] = 2
 FRAME_SKIP: Final[int] = 4  # Frames one action is held for
 SURVIVAL_REWARD: Final[float] = 0.01  # Per frame survived
 HIT_PENALTY: Final[float] = 1.0  # Per life lost
+# A beam passing the orbit this close to the planet, but missing it, is a near miss.
+NEAR_MISS_MARGIN: Final[float] = math.radians(10)
 MAX_EPISODE_FRAMES: Final[int] = FPS * 120  # Cut off runs at two minutes
 
 PLANET_FEATURES: Final[int] = 2  # speed, lives
@@ -56,12 +58,14 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         self,
         render_mode: str | None = None,
         max_episode_frames: int = MAX_EPISODE_FRAMES,
+        near_miss_penalty: float = 0.0,
     ) -> None:
         """Define the action and observation spaces; the game starts on reset.
 
         Args:
             render_mode: "human" to show the game in a window, or None.
             max_episode_frames: Frames after which a round is cut off.
+            near_miss_penalty: Penalty per frame per beam passing as a near miss.
         """
         self.action_space = gym.spaces.Discrete(3)
         self.observation_space = gym.spaces.Box(
@@ -69,6 +73,7 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         )
         self.render_mode = render_mode
         self.max_episode_frames = max_episode_frames
+        self.near_miss_penalty = near_miss_penalty
         self.logic = Logic()
         self.frames = 0
 
@@ -123,6 +128,8 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
             self.frames += 1
             reward += SURVIVAL_REWARD
             reward -= HIT_PENALTY * (lives_before - self.logic.lives)
+            if self.near_miss_penalty:
+                reward -= self.near_miss_penalty * self._near_misses()
             # Every frame, not every step, so playback runs at game speed.
             if self.render_mode == "human":
                 self.render()
@@ -219,6 +226,27 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
             )
 
         return np.clip(obs, -1.0, 1.0)
+
+    def _near_misses(self) -> int:
+        """Count beams crossing the orbit that only just miss the planet.
+
+        Uses the same band and angles as `Logic._check_collisions`.
+
+        Returns:
+            The number of near misses this frame.
+        """
+        planet = self.logic.planet
+        margin = math.asin(planet.size / planet.orbit_radius)
+        count = 0
+        for beam in self.logic.star.beams:
+            back = beam.radius - beam.width - planet.size
+            front = beam.radius + beam.width + planet.size
+            if not back < planet.orbit_radius < front:
+                continue
+            diff = (planet.angle + beam.angle + math.pi) % (2 * math.pi) - math.pi
+            if abs(diff) < beam.arc_range / 2 + margin + NEAR_MISS_MARGIN:
+                count += 1
+        return count
 
     def _info(self) -> dict[str, Any]:
         """Collect values for logging; the agent never sees them.
