@@ -18,8 +18,9 @@ from orbital_survival.config import (
     SCREEN_WIDTH,
     STAR_SIZE,
 )
+from orbital_survival.entities import star as star_module
 from orbital_survival.entities.base import CelestialBody
-from orbital_survival.entities.star import CANNON_COUNT, DECISION_INTERVAL
+from orbital_survival.entities.star import CANNON_COUNT, DECISION_INTERVAL, FIRE_CHANCE
 from orbital_survival.logic import Logic
 from orbital_survival.ui.hud import HUD, HUDState
 
@@ -59,6 +60,9 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         render_mode: str | None = None,
         max_episode_frames: int = MAX_EPISODE_FRAMES,
         near_miss_penalty: float = 0.0,
+        hit_penalty: float = HIT_PENALTY,
+        frame_skip: int = FRAME_SKIP,
+        fire_chance: float = FIRE_CHANCE,
     ) -> None:
         """Define the action and observation spaces; the game starts on reset.
 
@@ -66,6 +70,9 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
             render_mode: "human" to show the game in a window, or None.
             max_episode_frames: Frames after which a round is cut off.
             near_miss_penalty: Penalty per frame per beam passing as a near miss.
+            hit_penalty: Penalty per life lost.
+            frame_skip: Frames one action is held for.
+            fire_chance: Per-cannon chance to fire; above the game's makes it harder.
         """
         self.action_space = gym.spaces.Discrete(3)
         self.observation_space = gym.spaces.Box(
@@ -74,6 +81,9 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         self.render_mode = render_mode
         self.max_episode_frames = max_episode_frames
         self.near_miss_penalty = near_miss_penalty
+        self.hit_penalty = hit_penalty
+        self.frame_skip = frame_skip
+        self.fire_chance = fire_chance
         self.logic = Logic()
         self.frames = 0
 
@@ -110,7 +120,7 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
     def step(
         self, action: np.int64
     ) -> tuple[Observation, SupportsFloat, bool, bool, dict[str, Any]]:
-        """Hold the action for FRAME_SKIP frames and total up the reward.
+        """Hold the action for frame_skip frames and total up the reward.
 
         Args:
             action: NOOP, LEFT or RIGHT.
@@ -122,12 +132,14 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         self.logic.right_active = action == RIGHT
 
         reward = 0.0
-        for _ in range(FRAME_SKIP):
+        for _ in range(self.frame_skip):
             lives_before = self.logic.lives
+            # Star reads the module constant; set it per env so envs can differ.
+            star_module.FIRE_CHANCE = self.fire_chance
             self.logic.update()
             self.frames += 1
             reward += SURVIVAL_REWARD
-            reward -= HIT_PENALTY * (lives_before - self.logic.lives)
+            reward -= self.hit_penalty * (lives_before - self.logic.lives)
             if self.near_miss_penalty:
                 reward -= self.near_miss_penalty * self._near_misses()
             # Every frame, not every step, so playback runs at game speed.

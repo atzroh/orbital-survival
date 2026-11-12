@@ -12,6 +12,7 @@ from stable_baselines3 import PPO
 
 from orbital_survival.config import FPS
 from orbital_survival.rl.env import (
+    FRAME_SKIP,
     MAX_EPISODE_FRAMES,
     Observation,
     OrbitalSurvivalEnv,
@@ -41,11 +42,17 @@ def parse_args() -> argparse.Namespace:
         default=MAX_EPISODE_FRAMES // FPS,
         help="cut off each round after this many seconds",
     )
+    parser.add_argument(
+        "--frame-skip",
+        type=int,
+        default=FRAME_SKIP,
+        help="frames each action is held for; match the value used in training",
+    )
     return parser.parse_args()
 
 
 def run_episodes(
-    policy: Policy, episodes: int, max_seconds: int
+    policy: Policy, episodes: int, max_seconds: int, frame_skip: int
 ) -> list[tuple[int, float]]:
     """Play seeded rounds 0..episodes-1 with a policy.
 
@@ -53,11 +60,14 @@ def run_episodes(
         policy: Maps an observation to an action.
         episodes: Number of rounds to play.
         max_seconds: Seconds after which a round is cut off.
+        frame_skip: Frames each action is held for.
 
     Returns:
         (score, seconds survived) for each round.
     """
-    env = OrbitalSurvivalEnv(max_episode_frames=max_seconds * FPS)
+    env = OrbitalSurvivalEnv(
+        max_episode_frames=max_seconds * FPS, frame_skip=frame_skip
+    )
     results = []
     for seed in range(episodes):
         obs, info = env.reset(seed=seed)
@@ -95,11 +105,15 @@ def main() -> None:
         lambda obs: np.int64(model.predict(obs, deterministic=True)[0]),
         args.episodes,
         args.max_seconds,
+        args.frame_skip,
     )
 
     rng = np.random.default_rng(0)
     random_results = run_episodes(
-        lambda _: np.int64(rng.integers(3)), args.episodes, args.max_seconds
+        lambda _: np.int64(rng.integers(3)),
+        args.episodes,
+        args.max_seconds,
+        args.frame_skip,
     )
 
     print(f"{args.episodes} rounds each (seeds 0-{args.episodes - 1})")

@@ -13,7 +13,13 @@ from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 
 from orbital_survival.config import FPS
-from orbital_survival.rl.env import MAX_EPISODE_FRAMES, OrbitalSurvivalEnv
+from orbital_survival.entities.star import FIRE_CHANCE
+from orbital_survival.rl.env import (
+    FRAME_SKIP,
+    HIT_PENALTY,
+    MAX_EPISODE_FRAMES,
+    OrbitalSurvivalEnv,
+)
 
 NUM_ENVS = 4  # Rounds played in parallel to gather experience
 
@@ -106,6 +112,24 @@ def parse_args() -> argparse.Namespace:
         help="penalty per frame for each beam that only just misses the planet",
     )
     parser.add_argument(
+        "--hit-penalty",
+        type=float,
+        default=HIT_PENALTY,
+        help="penalty for each life lost",
+    )
+    parser.add_argument(
+        "--frame-skip",
+        type=int,
+        default=FRAME_SKIP,
+        help="frames each action is held for; evaluate and watch with the same value",
+    )
+    parser.add_argument(
+        "--fire-chance",
+        type=float,
+        default=FIRE_CHANCE,
+        help="per-cannon chance to fire while training; higher is harder",
+    )
+    parser.add_argument(
         "--torch-threads",
         type=int,
         default=1,
@@ -127,6 +151,9 @@ def main() -> None:
         env_kwargs={
             "max_episode_frames": args.max_seconds * FPS,
             "near_miss_penalty": args.near_miss_penalty,
+            "hit_penalty": args.hit_penalty,
+            "frame_skip": args.frame_skip,
+            "fire_chance": args.fire_chance,
         },
     )
     initial_lr: float = args.learning_rate

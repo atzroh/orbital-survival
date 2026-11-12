@@ -9,7 +9,7 @@ import numpy as np
 from stable_baselines3 import PPO
 
 from orbital_survival.config import FPS
-from orbital_survival.rl.env import MAX_EPISODE_FRAMES, OrbitalSurvivalEnv
+from orbital_survival.rl.env import FRAME_SKIP, MAX_EPISODE_FRAMES, OrbitalSurvivalEnv
 
 
 def parse_args() -> argparse.Namespace:
@@ -29,6 +29,12 @@ def parse_args() -> argparse.Namespace:
         help="cut off each round after this many seconds",
     )
     parser.add_argument(
+        "--frame-skip",
+        type=int,
+        default=FRAME_SKIP,
+        help="frames each action is held for; match the value used in training",
+    )
+    parser.add_argument(
         "--seed",
         type=int,
         help="replay this seeded round, as in evaluate, again and again",
@@ -42,7 +48,9 @@ def main() -> None:
 
     model = PPO.load(args.model, device="cpu")
     env = OrbitalSurvivalEnv(
-        render_mode="human", max_episode_frames=args.max_seconds * FPS
+        render_mode="human",
+        max_episode_frames=args.max_seconds * FPS,
+        frame_skip=args.frame_skip,
     )
 
     round_no = 0
