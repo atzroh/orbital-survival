@@ -35,8 +35,7 @@ SURVIVAL_REWARD: Final[float] = 0.01  # Per frame survived
 MAX_EPISODE_FRAMES: Final[int] = FPS * 300  # Cut off runs at five minutes
 
 PLANET_FEATURES: Final[int] = 1  # speed
-# speed, speed change over the last step, then sin/cos per cannon; only what
-# a player can read off the screen
+# speed, speed change over the last step, then sin/cos per cannon
 STAR_FEATURES: Final[int] = 2 + 2 * CANNON_COUNT
 BEAM_FEATURES: Final[int] = 3  # distance to orbit, sin, cos
 # Most beams incoming at once: 7 fire rolls in the 105 frames each is tracked,
