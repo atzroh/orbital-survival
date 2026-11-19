@@ -32,8 +32,6 @@ class PlayScene(Scene):
 
     def _initialize_state(self) -> None:
         """Build a fresh round: logic, buttons, HUD and telemetry."""
-        self.start_time = pygame.time.get_ticks()
-
         self.logic = Logic()
 
         # Circular buttons, centered on the lower edge.
@@ -101,7 +99,7 @@ class PlayScene(Scene):
                 GameMode.GAME_OVER,
                 GameResult(
                     score=self.logic.score,
-                    elapsed_ms=pygame.time.get_ticks() - self.start_time,
+                    elapsed_ms=self.logic.elapsed_ms,
                 ),
             )
         return None
@@ -124,6 +122,6 @@ class PlayScene(Scene):
                 planet_acceleration=self.logic.planet.actual_acceleration,
                 lives=self.logic.lives,
                 score=self.logic.score,
-                elapsed_ms=pygame.time.get_ticks() - self.start_time,
+                elapsed_ms=self.logic.elapsed_ms,
             ),
         )
