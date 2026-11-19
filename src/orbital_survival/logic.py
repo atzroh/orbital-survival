@@ -8,6 +8,7 @@ from typing import Final
 
 from orbital_survival.config import (
     CENTER_POS,
+    FPS,
     MAX_LIVES,
     PLANET_INITIAL_ANGLE,
     PLANET_ORBIT_RADIUS,
@@ -43,11 +44,18 @@ class Logic:
         self.corpses: list[BeamCorpse] = []
         self.score = 0
         self.lives = MAX_LIVES
+        # Frames stepped, so time follows the simulation, not the wall clock.
+        self.frames = 0
 
     @property
     def is_game_over(self) -> bool:
         """True once every life has been spent."""
         return self.lives <= 0
+
+    @property
+    def elapsed_ms(self) -> int:
+        """Game time played, in milliseconds."""
+        return self.frames * 1000 // FPS
 
     def update(self) -> None:
         """Step everything one frame, then resolve collisions.
@@ -65,6 +73,7 @@ class Logic:
         self._update_corpses()
 
         self._check_collisions()
+        self.frames += 1
 
     def _update_corpses(self) -> None:
         """Age the beam corpses and drop the ones that have expired."""

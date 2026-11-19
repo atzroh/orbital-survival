@@ -66,11 +66,6 @@ PLANET_INITIAL_ANGLE: Final[float] = math.pi / 2  # 90 degrees, downward
 # Star-related parameters
 STAR_SIZE: Final[int] = PLANET_SIZE * 3  # Star radius
 
-# --- Machine-learning-related parameters ---
-# Max beams in state:
-# (num cannons) x (BEAM_MAX_RADIUS - STAR_SIZE) / BEAM_SPEED / (fire interval)
-MAX_BEAMS: Final[int] = 39
-
 
 def scale_color(color: Color, ratio: float) -> Color:
     """Scale a color toward black, for fade-out effects.
