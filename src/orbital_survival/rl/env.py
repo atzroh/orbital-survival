@@ -35,8 +35,9 @@ SURVIVAL_REWARD: Final[float] = 0.01  # Per frame survived
 MAX_EPISODE_FRAMES: Final[int] = FPS * 300  # Cut off runs at five minutes
 
 PLANET_FEATURES: Final[int] = 1  # speed
-# speed, then sin/cos per cannon; only what a player can read off the screen
-STAR_FEATURES: Final[int] = 1 + 2 * CANNON_COUNT
+# speed, speed change over the last step, then sin/cos per cannon; only what
+# a player can read off the screen
+STAR_FEATURES: Final[int] = 2 + 2 * CANNON_COUNT
 BEAM_FEATURES: Final[int] = 3  # distance to orbit, sin, cos
 # Most beams incoming at once: 7 fire rolls in the 105 frames each is tracked,
 # times 3 cannons.
@@ -71,6 +72,8 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         self.render_mode = render_mode
         self.max_episode_frames = max_episode_frames
         self.logic = Logic()
+        # Star speed one step ago, so the agent can tell which way it turns.
+        self.prev_star_speed = self.logic.star.speed
 
         # Window state, created on the first frame drawn in "human" mode.
         self.screen: pygame.Surface | None = None
@@ -97,6 +100,7 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         if seed is not None:
             random.seed(seed)
         self.logic = Logic()
+        self.prev_star_speed = self.logic.star.speed
         if self.render_mode == "human":
             self.render()
         return self._observe(), self._info()
@@ -116,6 +120,7 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         """
         self.logic.left_active = action == LEFT
         self.logic.right_active = action == RIGHT
+        self.prev_star_speed = self.logic.star.speed
 
         reward = 0.0
         hit = False
@@ -192,6 +197,10 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         obs[: PLANET_FEATURES + STAR_FEATURES] = (
             planet.speed / CelestialBody.MAX_SPEED,
             star.speed / CelestialBody.MAX_SPEED,
+            # Thrust and friction each change the speed by up to about
+            # ACCELERATION per frame.
+            (star.speed - self.prev_star_speed)
+            / (2 * CelestialBody.ACCELERATION * FRAME_SKIP),
             *cannons,
         )
 

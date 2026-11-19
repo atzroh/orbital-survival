@@ -34,7 +34,9 @@ def parse_args() -> argparse.Namespace:
         help="where to save the model (.zip is appended)",
     )
     parser.add_argument(
-        "--resume", help="saved model to continue training from (.zip optional)"
+        "--resume",
+        help="saved model to continue training from (.zip optional); "
+        "not recommended for --linear-lr models",
     )
     parser.add_argument(
         "--checkpoint-every",
@@ -58,7 +60,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--linear-lr",
         action="store_true",
-        help="decay the learning rate linearly to 0; ignored with --resume",
+        help="decay the learning rate linearly to 0; ignored with --resume, "
+        "and a model trained with it is not meant to be resumed",
     )
     parser.add_argument(
         "--gamma",
