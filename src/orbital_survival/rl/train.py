@@ -1,6 +1,6 @@
 """Train a PPO agent on OrbitalSurvivalEnv and save it.
 
-Run with `uv run --group rl python -m orbital_survival.rl.train`.
+Run with `uv run --group rl python -m orbital_survival.rl.train --seed 0`.
 """
 
 import argparse
