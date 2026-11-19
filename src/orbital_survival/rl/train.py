@@ -79,6 +79,12 @@ def parse_args() -> argparse.Namespace:
         help="rounds played at once to gather experience",
     )
     parser.add_argument(
+        "--seed",
+        type=int,
+        required=True,
+        help="seed for the network and the rounds, to repeat a run",
+    )
+    parser.add_argument(
         "--batch-size",
         type=int,
         default=64,
@@ -140,10 +146,11 @@ def main() -> None:
             ent_coef=args.ent_coef,
             policy_kwargs={"net_arch": args.net_arch},
             verbose=1,
+            seed=args.seed,
             device="cpu",
         )
     else:
-        model = PPO.load(args.resume, env=env, device="cpu")
+        model = PPO.load(args.resume, env=env, device="cpu", seed=args.seed)
     out = Path(args.out)
     # save_freq counts calls to the vectorized env, each --num-envs steps.
     checkpoint = CheckpointCallback(
