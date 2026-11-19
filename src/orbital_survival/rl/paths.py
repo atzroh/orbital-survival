@@ -6,7 +6,7 @@ from typing import Final
 RUNS_DIR: Final[Path] = Path("runs")
 MODEL_NAME: Final[str] = "model"  # model.zip, plus model_<steps>_steps.zip snapshots
 MODEL_FILE: Final[str] = MODEL_NAME + ".zip"
-ARGS_FILE: Final[str] = "args.json"
+CONFIG_FILE: Final[str] = "config.json"
 PROGRESS_FILE: Final[str] = "progress.csv"
 
 

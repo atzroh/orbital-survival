@@ -39,7 +39,7 @@ Each run keeps everything under `runs/<name>/` (ignored by git):
 runs/foo
 ├── model.zip                # final model
 ├── model_100000_steps.zip   # snapshot every --checkpoint-every steps
-├── args.json                # arguments of each train invocation
+├── config.json              # training conditions of each train invocation
 ├── progress.csv             # training log, one row per PPO update
 └── events.out.tfevents.*    # the same log for TensorBoard
 ```
@@ -83,8 +83,10 @@ every `--checkpoint-every` steps in the run folder. The network and PPO
 hyperparameters (`--net-arch`, `--learning-rate`, `--gamma`, ...) apply to a
 new model only.
 
-Before training starts, `train` appends its arguments to `args.json`, so the
-first entry always shows how the model was created.
+Before training starts, `train` appends its conditions to `config.json`: the
+steps it trains for, its PyTorch threads, and the PPO settings the model
+actually trains with, SB3 defaults included. A resumed run adds an entry of its own, so the first
+entry always shows how the model was created.
 
 The training log goes to the console as before, and to `progress.csv` and
 TensorBoard. `rollout/ep_len_mean` is the one to watch: multiply it by 8 / 120

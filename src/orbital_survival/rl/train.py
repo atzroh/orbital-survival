@@ -6,8 +6,9 @@ Run with `uv run --group rl python -m orbital_survival.rl.train --name foo --see
 import argparse
 import json
 import sys
-from datetime import datetime
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import torch
 from stable_baselines3 import PPO
@@ -23,7 +24,7 @@ from stable_baselines3.common.logger import (
 
 from orbital_survival.rl.env import OrbitalSurvivalEnv
 from orbital_survival.rl.paths import (
-    ARGS_FILE,
+    CONFIG_FILE,
     MODEL_FILE,
     MODEL_NAME,
     PROGRESS_FILE,
@@ -131,21 +132,69 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def save_run_history(run_dir: Path, args: argparse.Namespace, start_steps: int) -> None:
-    """Append this run's arguments to the history in the run folder.
+def start_value(value: float | Callable[[float], float]) -> float:
+    """Value of a setting SB3 may hold as a schedule, at the start of training.
+
+    Args:
+        value: A number, or a schedule taking the remaining progress.
+
+    Returns:
+        The number, or the schedule at progress 1.
+    """
+    return value(1.0) if callable(value) else value
+
+
+def ppo_settings(model: PPO) -> dict[str, Any]:
+    """Hyperparameters the model actually trains with, SB3 defaults included.
+
+    With --resume these come from the saved model, not the command line.
+
+    Args:
+        model: The model about to train.
+
+    Returns:
+        Setting name to value; schedules are given at their starting value.
+    """
+    clip_range_vf = model.clip_range_vf
+    return {
+        "learning_rate": start_value(model.learning_rate),
+        "linear_lr": callable(model.learning_rate),
+        "gamma": model.gamma,
+        "gae_lambda": model.gae_lambda,
+        "n_steps": model.n_steps,
+        "n_envs": model.n_envs,
+        "batch_size": model.batch_size,
+        "n_epochs": model.n_epochs,
+        "ent_coef": model.ent_coef,
+        "vf_coef": model.vf_coef,
+        "max_grad_norm": model.max_grad_norm,
+        "clip_range": start_value(model.clip_range),
+        "clip_range_vf": None if clip_range_vf is None else start_value(clip_range_vf),
+        "normalize_advantage": model.normalize_advantage,
+        "target_kl": model.target_kl,
+        "net_arch": model.policy_kwargs.get("net_arch"),
+        "activation_fn": model.policy.activation_fn.__name__,
+        "seed": model.seed,
+    }
+
+
+def save_run_record(run_dir: Path, args: argparse.Namespace, model: PPO) -> None:
+    """Append the conditions of this invocation to the record in the run folder.
 
     Args:
         run_dir: The run folder.
         args: The parsed arguments.
-        start_steps: Steps the model had already been trained for.
+        model: The model about to train.
     """
-    path = run_dir / ARGS_FILE
+    path = run_dir / CONFIG_FILE
     history = json.loads(path.read_text()) if path.exists() else []
     history.append(
         {
-            "started": datetime.now().isoformat(timespec="seconds"),
-            "start_steps": start_steps,
-            "args": vars(args),
+            "train": {
+                "timesteps": args.timesteps,
+                "torch_threads": args.torch_threads,
+            },
+            "ppo": ppo_settings(model),
         }
     )
     path.write_text(json.dumps(history, indent=2) + "\n")
@@ -217,7 +266,7 @@ def main() -> None:
             device="cpu",
         )
     run_dir.mkdir(parents=True, exist_ok=True)
-    save_run_history(run_dir, args, model.num_timesteps)
+    save_run_record(run_dir, args, model)
     # The console table as before, plus CSV and TensorBoard copies to keep.
     model.set_logger(
         Logger(
@@ -235,12 +284,16 @@ def main() -> None:
         save_path=str(run_dir),
         name_prefix=MODEL_NAME,
     )
-    # Without a reset the step count, and so checkpoint names, carry on.
-    model.learn(
-        total_timesteps=args.timesteps,
-        callback=checkpoint,
-        reset_num_timesteps=not args.resume,
-    )
+    try:
+        # Without a reset the step count, and so checkpoint names, carry on.
+        model.learn(
+            total_timesteps=args.timesteps,
+            callback=checkpoint,
+            reset_num_timesteps=not args.resume,
+        )
+    except KeyboardInterrupt:
+        # Keep what was learned, so --resume can carry on from here.
+        print("Interrupted")
     model.save(run_dir / MODEL_NAME)
     print(f"Saved model to {run_dir / MODEL_FILE}")
 
