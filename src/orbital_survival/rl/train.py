@@ -14,8 +14,6 @@ from stable_baselines3.common.env_util import make_vec_env
 
 from orbital_survival.rl.env import OrbitalSurvivalEnv
 
-NUM_ENVS = 4  # Rounds played in parallel to gather experience
-
 
 def parse_args() -> argparse.Namespace:
     """Parse the command line.
@@ -75,6 +73,12 @@ def parse_args() -> argparse.Namespace:
         help="steps per env between updates of a new model; ignored with --resume",
     )
     parser.add_argument(
+        "--num-envs",
+        type=int,
+        default=1,
+        help="rounds played at once to gather experience",
+    )
+    parser.add_argument(
         "--batch-size",
         type=int,
         default=64,
@@ -108,7 +112,7 @@ def main() -> None:
 
     check_env(OrbitalSurvivalEnv())
 
-    env = make_vec_env(OrbitalSurvivalEnv, n_envs=NUM_ENVS)
+    env = make_vec_env(OrbitalSurvivalEnv, n_envs=args.num_envs)
     initial_lr: float = args.learning_rate
 
     def linear_lr(progress: float) -> float:
@@ -141,9 +145,9 @@ def main() -> None:
     else:
         model = PPO.load(args.resume, env=env, device="cpu")
     out = Path(args.out)
-    # save_freq counts calls to the vectorized env, each NUM_ENVS steps.
+    # save_freq counts calls to the vectorized env, each --num-envs steps.
     checkpoint = CheckpointCallback(
-        save_freq=max(args.checkpoint_every // NUM_ENVS, 1),
+        save_freq=max(args.checkpoint_every // args.num_envs, 1),
         save_path=str(out.parent),
         name_prefix=out.name,
     )
