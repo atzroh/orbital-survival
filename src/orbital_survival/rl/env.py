@@ -20,7 +20,7 @@ from orbital_survival.config import (
 )
 from orbital_survival.entities import star as star_module
 from orbital_survival.entities.base import CelestialBody
-from orbital_survival.entities.star import CANNON_COUNT, DECISION_INTERVAL, FIRE_CHANCE
+from orbital_survival.entities.star import CANNON_COUNT, FIRE_CHANCE
 from orbital_survival.logic import Logic
 from orbital_survival.ui.hud import HUD, HUDState
 
@@ -36,8 +36,8 @@ SURVIVAL_REWARD: Final[float] = 0.01  # Per frame survived
 MAX_EPISODE_FRAMES: Final[int] = FPS * 120  # Cut off runs at two minutes
 
 PLANET_FEATURES: Final[int] = 1  # speed
-# speed, spin direction, time to next fire roll, then sin/cos per cannon
-STAR_FEATURES: Final[int] = 3 + 2 * CANNON_COUNT
+# speed, then sin/cos per cannon; only what a player can read off the screen
+STAR_FEATURES: Final[int] = 1 + 2 * CANNON_COUNT
 BEAM_FEATURES: Final[int] = 4  # present, distance to orbit, sin, cos
 # Incoming beams kept; rarely more than this are on their way at once.
 BEAM_SLOTS: Final[int] = 16
@@ -203,8 +203,6 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         obs[: PLANET_FEATURES + STAR_FEATURES] = (
             planet.speed / CelestialBody.MAX_SPEED,
             star.speed / CelestialBody.MAX_SPEED,
-            star.random_direction,
-            (DECISION_INTERVAL - star.beam_timer) / DECISION_INTERVAL,
             *cannons,
         )
 
