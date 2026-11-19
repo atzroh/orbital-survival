@@ -32,7 +32,7 @@ RIGHT: Final[int] = 2
 
 FRAME_SKIP: Final[int] = 8  # Frames one action is held for
 SURVIVAL_REWARD: Final[float] = 0.01  # Per frame survived
-MAX_EPISODE_FRAMES: Final[int] = FPS * 120  # Cut off runs at two minutes
+MAX_EPISODE_FRAMES: Final[int] = FPS * 300  # Cut off runs at five minutes
 
 PLANET_FEATURES: Final[int] = 1  # speed
 # speed, then sin/cos per cannon; only what a player can read off the screen

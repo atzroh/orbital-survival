@@ -12,8 +12,7 @@ from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 
-from orbital_survival.config import FPS
-from orbital_survival.rl.env import MAX_EPISODE_FRAMES, OrbitalSurvivalEnv
+from orbital_survival.rl.env import OrbitalSurvivalEnv
 
 NUM_ENVS = 4  # Rounds played in parallel to gather experience
 
@@ -28,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--timesteps",
         type=int,
-        default=500_000,
+        default=1_000_000,
         help="agent steps to train (on top of the saved ones with --resume)",
     )
     parser.add_argument(
@@ -42,7 +41,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--checkpoint-every",
         type=int,
-        default=500_000,
+        default=100_000,
         help="also save a snapshot every this many steps, next to --out",
     )
     parser.add_argument(
@@ -61,7 +60,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--linear-lr",
         action="store_true",
-        help="decay the learning rate linearly to 0 over training",
+        help="decay the learning rate linearly to 0; ignored with --resume",
     )
     parser.add_argument(
         "--gamma",
@@ -94,12 +93,6 @@ def parse_args() -> argparse.Namespace:
         help="entropy bonus that keeps actions random; ignored with --resume",
     )
     parser.add_argument(
-        "--max-seconds",
-        type=int,
-        default=MAX_EPISODE_FRAMES // FPS,
-        help="cut off each training round after this many seconds",
-    )
-    parser.add_argument(
         "--torch-threads",
         type=int,
         default=1,
@@ -115,11 +108,7 @@ def main() -> None:
 
     check_env(OrbitalSurvivalEnv())
 
-    env = make_vec_env(
-        OrbitalSurvivalEnv,
-        n_envs=NUM_ENVS,
-        env_kwargs={"max_episode_frames": args.max_seconds * FPS},
-    )
+    env = make_vec_env(OrbitalSurvivalEnv, n_envs=NUM_ENVS)
     initial_lr: float = args.learning_rate
 
     def linear_lr(progress: float) -> float:
