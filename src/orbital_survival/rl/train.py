@@ -13,12 +13,7 @@ from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 
 from orbital_survival.config import FPS
-from orbital_survival.entities.star import FIRE_CHANCE
-from orbital_survival.rl.env import (
-    FRAME_SKIP,
-    MAX_EPISODE_FRAMES,
-    OrbitalSurvivalEnv,
-)
+from orbital_survival.rl.env import MAX_EPISODE_FRAMES, OrbitalSurvivalEnv
 
 NUM_ENVS = 4  # Rounds played in parallel to gather experience
 
@@ -105,18 +100,6 @@ def parse_args() -> argparse.Namespace:
         help="cut off each training round after this many seconds",
     )
     parser.add_argument(
-        "--frame-skip",
-        type=int,
-        default=FRAME_SKIP,
-        help="frames each action is held for; evaluate and watch with the same value",
-    )
-    parser.add_argument(
-        "--fire-chance",
-        type=float,
-        default=FIRE_CHANCE,
-        help="per-cannon chance to fire while training; higher is harder",
-    )
-    parser.add_argument(
         "--torch-threads",
         type=int,
         default=1,
@@ -135,11 +118,7 @@ def main() -> None:
     env = make_vec_env(
         OrbitalSurvivalEnv,
         n_envs=NUM_ENVS,
-        env_kwargs={
-            "max_episode_frames": args.max_seconds * FPS,
-            "frame_skip": args.frame_skip,
-            "fire_chance": args.fire_chance,
-        },
+        env_kwargs={"max_episode_frames": args.max_seconds * FPS},
     )
     initial_lr: float = args.learning_rate
 
