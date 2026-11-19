@@ -1,15 +1,17 @@
 """Watch a trained model play in the game window, round after round.
 
-Run with `uv run --group rl python -m orbital_survival.rl.watch`.
+Run with `uv run --group rl python -m orbital_survival.rl.watch --name foo`.
 """
 
 import argparse
+import sys
 
 import numpy as np
 from stable_baselines3 import PPO
 
 from orbital_survival.config import FPS
 from orbital_survival.rl.env import MAX_EPISODE_FRAMES, OrbitalSurvivalEnv
+from orbital_survival.rl.paths import model_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -20,7 +22,12 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description="Watch a trained PPO agent play.")
     parser.add_argument(
-        "--model", default="models/ppo_orbital", help="saved model (.zip optional)"
+        "--name", required=True, help="run to load, the name given to train"
+    )
+    parser.add_argument(
+        "--steps",
+        type=int,
+        help="load the snapshot saved at this step count instead of the final model",
     )
     parser.add_argument(
         "--max-seconds",
@@ -40,7 +47,10 @@ def main() -> None:
     """Play rounds until the window is closed, printing each result."""
     args = parse_args()
 
-    model = PPO.load(args.model, device="cpu")
+    path = model_path(args.name, args.steps)
+    if not path.exists():
+        sys.exit(f"No model at {path}")
+    model = PPO.load(path, device="cpu")
     env = OrbitalSurvivalEnv(
         render_mode="human",
         max_episode_frames=args.max_seconds * FPS,

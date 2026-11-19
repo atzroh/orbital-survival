@@ -1,9 +1,10 @@
 """Compare a trained model with a random policy over the same seeded rounds.
 
-Run with `uv run --group rl python -m orbital_survival.rl.evaluate`.
+Run with `uv run --group rl python -m orbital_survival.rl.evaluate --name foo`.
 """
 
 import argparse
+import sys
 from collections.abc import Callable
 from statistics import mean
 
@@ -12,6 +13,7 @@ from stable_baselines3 import PPO
 
 from orbital_survival.config import FPS
 from orbital_survival.rl.env import MAX_EPISODE_FRAMES, Observation, OrbitalSurvivalEnv
+from orbital_survival.rl.paths import model_path
 
 type Policy = Callable[[Observation], np.int64]
 
@@ -26,7 +28,12 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description="Evaluate a trained PPO agent.")
     parser.add_argument(
-        "--model", default="models/ppo_orbital", help="saved model (.zip optional)"
+        "--name", required=True, help="run to load, the name given to train"
+    )
+    parser.add_argument(
+        "--steps",
+        type=int,
+        help="load the snapshot saved at this step count instead of the final model",
     )
     parser.add_argument(
         "--episodes", type=int, default=20, help="rounds to play per policy"
@@ -85,7 +92,10 @@ def main() -> None:
     """Evaluate the model and a random policy, then print a comparison."""
     args = parse_args()
 
-    model = PPO.load(args.model, device="cpu")
+    path = model_path(args.name, args.steps)
+    if not path.exists():
+        sys.exit(f"No model at {path}")
+    model = PPO.load(path, device="cpu")
     # Act greedily: no exploration noise, so this measures the real skill.
     model_results = run_episodes(
         lambda obs: np.int64(model.predict(obs, deterministic=True)[0]),

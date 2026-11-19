@@ -120,6 +120,7 @@ just ended is still readable on the game-over screen.
 │     ├── logic.py             # physics, collisions, lives and scoring
 │     ├── rl                   # PPO agent; see its README.md
 │     │  ├── env.py            # Gymnasium environment
+│     │  ├── paths.py          # run folder layout under runs/
 │     │  ├── train.py
 │     │  ├── evaluate.py
 │     │  └── watch.py

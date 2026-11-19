@@ -17,15 +17,8 @@ build-backend = "hatchling.build"
 packages = ["src/orbital_survival"]
 
 [dependency-groups]
-dev = [
-    "gymnasium>=1.4.0",
-    "mypy>=2.3.0",
-    "ruff>=0.16.3",
-]
-rl = [
-    "gymnasium>=1.4.0",
-    "stable-baselines3>=2.9.2",
-]
+dev = ["gymnasium>=1.4.0", "mypy>=2.3.0", "ruff>=0.16.3"]
+rl = ["gymnasium>=1.4.0", "stable-baselines3>=2.9.2", "tensorboard>=2.21.0"]
 
 [tool.mypy]
 python_version = "3.12"
