@@ -71,7 +71,6 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         self.render_mode = render_mode
         self.max_episode_frames = max_episode_frames
         self.logic = Logic()
-        self.frames = 0
 
         # Window state, created on the first frame drawn in "human" mode.
         self.screen: pygame.Surface | None = None
@@ -98,7 +97,6 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         if seed is not None:
             random.seed(seed)
         self.logic = Logic()
-        self.frames = 0
         if self.render_mode == "human":
             self.render()
         return self._observe(), self._info()
@@ -123,7 +121,6 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         hit = False
         for _ in range(FRAME_SKIP):
             self.logic.update()
-            self.frames += 1
             reward += SURVIVAL_REWARD
             # Every frame, not every step, so playback runs at game speed.
             if self.render_mode == "human":
@@ -134,7 +131,7 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
                 break
 
         terminated = hit
-        truncated = not terminated and self.frames >= self.max_episode_frames
+        truncated = not terminated and self.logic.frames >= self.max_episode_frames
         return self._observe(), reward, terminated, truncated, self._info()
 
     def render(self) -> None:
@@ -164,7 +161,7 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
                 planet_acceleration=self.logic.planet.actual_acceleration,
                 lives=0,  # No hearts: one hit ends the round
                 score=self.logic.score,
-                elapsed_ms=self.frames * 1000 // FPS,
+                elapsed_ms=self.logic.elapsed_ms,
             ),
         )
         pygame.display.flip()
@@ -230,5 +227,5 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         """
         return {
             "score": self.logic.score,
-            "frames": self.frames,
+            "frames": self.logic.frames,
         }
