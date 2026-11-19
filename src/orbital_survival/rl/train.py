@@ -4,6 +4,8 @@ Run with `uv run --group rl python -m orbital_survival.rl.train --seed 0`.
 """
 
 import argparse
+import json
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -114,6 +116,32 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def save_run_history(args: argparse.Namespace, start_steps: int) -> None:
+    """Append this run's arguments to the history saved next to the model.
+
+    A resumed run carries on the history of the model it resumed from.
+
+    Args:
+        args: The parsed arguments.
+        start_steps: Steps the model had already been trained for.
+    """
+    history = []
+    if args.resume is not None:
+        source = Path(args.resume.removesuffix(".zip") + ".json")
+        if source.exists():
+            history = json.loads(source.read_text())
+    history.append(
+        {
+            "started": datetime.now().isoformat(timespec="seconds"),
+            "start_steps": start_steps,
+            "args": vars(args),
+        }
+    )
+    path = Path(args.out + ".json")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(history, indent=2) + "\n")
+
+
 def main() -> None:
     """Check the environment, train PPO, and save the model."""
     args = parse_args()
@@ -154,6 +182,7 @@ def main() -> None:
         )
     else:
         model = PPO.load(args.resume, env=env, device="cpu", seed=args.seed)
+    save_run_history(args, model.num_timesteps)
     out = Path(args.out)
     # save_freq counts calls to the vectorized env, each --num-envs steps.
     checkpoint = CheckpointCallback(

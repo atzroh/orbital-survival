@@ -65,6 +65,11 @@ every `--checkpoint-every` steps next to `--out`. The network and PPO
 hyperparameters (`--net-arch`, `--learning-rate`, `--gamma`, ...) apply to a
 new model only.
 
+Each run also writes its arguments to a JSON file next to the model
+(`ppo_orbital.json` by default) before training starts. A resumed run copies
+the history of the model it resumed from and appends its own entry, so the
+first entry always shows how the model was created.
+
 ### Reproducibility
 
 `--seed` seeds Python's `random`, NumPy, PyTorch and the first round of each
