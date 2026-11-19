@@ -12,12 +12,12 @@ import numpy as np
 from stable_baselines3 import PPO
 
 from orbital_survival.config import FPS
-from orbital_survival.rl.env import MAX_EPISODE_FRAMES, Observation, OrbitalSurvivalEnv
+from orbital_survival.rl.env import Observation, OrbitalSurvivalEnv
 from orbital_survival.rl.paths import model_path
 
 type Policy = Callable[[Observation], np.int64]
 
-SHORT_SECONDS = 60  # Rounds lost before this are the ones to get rid of
+MAX_SECONDS = 15 * 60  # Cut off each round at fifteen minutes
 
 
 def parse_args() -> argparse.Namespace:
@@ -38,29 +38,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--episodes", type=int, default=20, help="rounds to play per policy"
     )
-    parser.add_argument(
-        "--max-seconds",
-        type=int,
-        default=MAX_EPISODE_FRAMES // FPS,
-        help="cut off each round after this many seconds",
-    )
     return parser.parse_args()
 
 
-def run_episodes(
-    policy: Policy, episodes: int, max_seconds: int
-) -> list[tuple[int, float]]:
+def run_episodes(policy: Policy, episodes: int) -> list[tuple[int, float]]:
     """Play seeded rounds 0..episodes-1 with a policy.
 
     Args:
         policy: Maps an observation to an action.
         episodes: Number of rounds to play.
-        max_seconds: Seconds after which a round is cut off.
 
     Returns:
         (score, seconds survived) for each round.
     """
-    env = OrbitalSurvivalEnv(max_episode_frames=max_seconds * FPS)
+    env = OrbitalSurvivalEnv(max_episode_frames=MAX_SECONDS * FPS)
     results = []
     for seed in range(episodes):
         obs, info = env.reset(seed=seed)
@@ -100,26 +91,15 @@ def main() -> None:
     model_results = run_episodes(
         lambda obs: np.int64(model.predict(obs, deterministic=True)[0]),
         args.episodes,
-        args.max_seconds,
     )
 
     rng = np.random.default_rng(0)
-    random_results = run_episodes(
-        lambda _: np.int64(rng.integers(3)),
-        args.episodes,
-        args.max_seconds,
-    )
+    random_results = run_episodes(lambda _: np.int64(rng.integers(3)), args.episodes)
 
     print(f"{args.episodes} rounds each (seeds 0-{args.episodes - 1})")
     print("policy  score (mean/min/max)  survival s (mean/min/max)")
     print_row("model", model_results)
     print_row("random", random_results)
-    short = [
-        str(seed) for seed, (_, sec) in enumerate(model_results) if sec < SHORT_SECONDS
-    ]
-    print(
-        f"model rounds under {SHORT_SECONDS} s: {len(short)} (seeds {' '.join(short)})"
-    )
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ import numpy as np
 from stable_baselines3 import PPO
 
 from orbital_survival.config import FPS
-from orbital_survival.rl.env import MAX_EPISODE_FRAMES, OrbitalSurvivalEnv
+from orbital_survival.rl.env import OrbitalSurvivalEnv
 from orbital_survival.rl.paths import model_path
 
 
@@ -30,12 +30,6 @@ def parse_args() -> argparse.Namespace:
         help="load the snapshot saved at this step count instead of the final model",
     )
     parser.add_argument(
-        "--max-seconds",
-        type=int,
-        default=MAX_EPISODE_FRAMES // FPS,
-        help="cut off each round after this many seconds",
-    )
-    parser.add_argument(
         "--seed",
         type=int,
         help="replay this seeded round, as in evaluate, again and again",
@@ -51,10 +45,7 @@ def main() -> None:
     if not path.exists():
         sys.exit(f"No model at {path}")
     model = PPO.load(path, device="cpu")
-    env = OrbitalSurvivalEnv(
-        render_mode="human",
-        max_episode_frames=args.max_seconds * FPS,
-    )
+    env = OrbitalSurvivalEnv(render_mode="human")
 
     round_no = 0
     while not env.quit_requested:
@@ -63,8 +54,8 @@ def main() -> None:
         done = False
         while not done and not env.quit_requested:
             action = np.int64(model.predict(obs, deterministic=True)[0])
-            obs, _, terminated, truncated, info = env.step(action)
-            done = terminated or truncated
+            obs, _, terminated, _, info = env.step(action)
+            done = terminated  # No cut-off: play until hit
         if done:
             seconds = info["frames"] / FPS
             print(f"round {round_no}: score {info['score']}, survived {seconds:.1f}s")
