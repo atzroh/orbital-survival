@@ -33,12 +33,9 @@ RIGHT: Final[int] = 2
 
 FRAME_SKIP: Final[int] = 4  # Frames one action is held for
 SURVIVAL_REWARD: Final[float] = 0.01  # Per frame survived
-HIT_PENALTY: Final[float] = 1.0  # Per life lost
-# A beam passing the orbit this close to the planet, but missing it, is a near miss.
-NEAR_MISS_MARGIN: Final[float] = math.radians(10)
 MAX_EPISODE_FRAMES: Final[int] = FPS * 120  # Cut off runs at two minutes
 
-PLANET_FEATURES: Final[int] = 2  # speed, lives
+PLANET_FEATURES: Final[int] = 1  # speed
 # speed, spin direction, time to next fire roll, then sin/cos per cannon
 STAR_FEATURES: Final[int] = 3 + 2 * CANNON_COUNT
 BEAM_FEATURES: Final[int] = 4  # present, distance to orbit, sin, cos
@@ -50,6 +47,7 @@ OBS_SIZE: Final[int] = PLANET_FEATURES + STAR_FEATURES + BEAM_SLOTS * BEAM_FEATU
 class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
     """Orbital Survival as an RL environment: dodge beams for as long as possible.
 
+    A round ends on the first hit, whatever the game's lives.
     Relative angles are `planet + other`, matching `Logic._check_collisions`.
     """
 
@@ -59,8 +57,6 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         self,
         render_mode: str | None = None,
         max_episode_frames: int = MAX_EPISODE_FRAMES,
-        near_miss_penalty: float = 0.0,
-        hit_penalty: float = HIT_PENALTY,
         frame_skip: int = FRAME_SKIP,
         fire_chance: float = FIRE_CHANCE,
     ) -> None:
@@ -69,8 +65,6 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         Args:
             render_mode: "human" to show the game in a window, or None.
             max_episode_frames: Frames after which a round is cut off.
-            near_miss_penalty: Penalty per frame per beam passing as a near miss.
-            hit_penalty: Penalty per life lost.
             frame_skip: Frames one action is held for.
             fire_chance: Per-cannon chance to fire; above the game's makes it harder.
         """
@@ -80,8 +74,6 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         )
         self.render_mode = render_mode
         self.max_episode_frames = max_episode_frames
-        self.near_miss_penalty = near_miss_penalty
-        self.hit_penalty = hit_penalty
         self.frame_skip = frame_skip
         self.fire_chance = fire_chance
         self.logic = Logic()
@@ -122,6 +114,8 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
     ) -> tuple[Observation, SupportsFloat, bool, bool, dict[str, Any]]:
         """Hold the action for frame_skip frames and total up the reward.
 
+        The round ends on the first hit.
+
         Args:
             action: NOOP, LEFT or RIGHT.
 
@@ -132,23 +126,22 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         self.logic.right_active = action == RIGHT
 
         reward = 0.0
+        hit = False
         for _ in range(self.frame_skip):
-            lives_before = self.logic.lives
             # Star reads the module constant; set it per env so envs can differ.
             star_module.FIRE_CHANCE = self.fire_chance
             self.logic.update()
             self.frames += 1
             reward += SURVIVAL_REWARD
-            reward -= self.hit_penalty * (lives_before - self.logic.lives)
-            if self.near_miss_penalty:
-                reward -= self.near_miss_penalty * self._near_misses()
             # Every frame, not every step, so playback runs at game speed.
             if self.render_mode == "human":
                 self.render()
-            if self.logic.is_game_over:
+            # Lives only tell whether a hit happened; the agent never sees them.
+            hit = self.logic.lives < MAX_LIVES
+            if hit:
                 break
 
-        terminated = self.logic.is_game_over
+        terminated = hit
         truncated = not terminated and self.frames >= self.max_episode_frames
         return self._observe(), reward, terminated, truncated, self._info()
 
@@ -177,7 +170,7 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
             HUDState(
                 planet_speed=self.logic.planet.speed,
                 planet_acceleration=self.logic.planet.actual_acceleration,
-                lives=self.logic.lives,
+                lives=0,  # No hearts: one hit ends the round
                 score=self.logic.score,
                 elapsed_ms=self.frames * 1000 // FPS,
             ),
@@ -209,7 +202,6 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
             cannons += [math.sin(cannon_angle), math.cos(cannon_angle)]
         obs[: PLANET_FEATURES + STAR_FEATURES] = (
             planet.speed / CelestialBody.MAX_SPEED,
-            self.logic.lives / MAX_LIVES,
             star.speed / CelestialBody.MAX_SPEED,
             star.random_direction,
             (DECISION_INTERVAL - star.beam_timer) / DECISION_INTERVAL,
@@ -239,35 +231,13 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
 
         return np.clip(obs, -1.0, 1.0)
 
-    def _near_misses(self) -> int:
-        """Count beams crossing the orbit that only just miss the planet.
-
-        Uses the same band and angles as `Logic._check_collisions`.
-
-        Returns:
-            The number of near misses this frame.
-        """
-        planet = self.logic.planet
-        margin = math.asin(planet.size / planet.orbit_radius)
-        count = 0
-        for beam in self.logic.star.beams:
-            back = beam.radius - beam.width - planet.size
-            front = beam.radius + beam.width + planet.size
-            if not back < planet.orbit_radius < front:
-                continue
-            diff = (planet.angle + beam.angle + math.pi) % (2 * math.pi) - math.pi
-            if abs(diff) < beam.arc_range / 2 + margin + NEAR_MISS_MARGIN:
-                count += 1
-        return count
-
     def _info(self) -> dict[str, Any]:
         """Collect values for logging; the agent never sees them.
 
         Returns:
-            Score, lives and frames elapsed.
+            Score and frames elapsed.
         """
         return {
             "score": self.logic.score,
-            "lives": self.logic.lives,
             "frames": self.frames,
         }

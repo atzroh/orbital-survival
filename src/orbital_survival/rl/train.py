@@ -16,7 +16,6 @@ from orbital_survival.config import FPS
 from orbital_survival.entities.star import FIRE_CHANCE
 from orbital_survival.rl.env import (
     FRAME_SKIP,
-    HIT_PENALTY,
     MAX_EPISODE_FRAMES,
     OrbitalSurvivalEnv,
 )
@@ -106,18 +105,6 @@ def parse_args() -> argparse.Namespace:
         help="cut off each training round after this many seconds",
     )
     parser.add_argument(
-        "--near-miss-penalty",
-        type=float,
-        default=0.0,
-        help="penalty per frame for each beam that only just misses the planet",
-    )
-    parser.add_argument(
-        "--hit-penalty",
-        type=float,
-        default=HIT_PENALTY,
-        help="penalty for each life lost",
-    )
-    parser.add_argument(
         "--frame-skip",
         type=int,
         default=FRAME_SKIP,
@@ -150,8 +137,6 @@ def main() -> None:
         n_envs=NUM_ENVS,
         env_kwargs={
             "max_episode_frames": args.max_seconds * FPS,
-            "near_miss_penalty": args.near_miss_penalty,
-            "hit_penalty": args.hit_penalty,
             "frame_skip": args.frame_skip,
             "fire_chance": args.fire_chance,
         },
