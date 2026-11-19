@@ -39,8 +39,9 @@ PLANET_FEATURES: Final[int] = 1  # speed
 # speed, then sin/cos per cannon; only what a player can read off the screen
 STAR_FEATURES: Final[int] = 1 + 2 * CANNON_COUNT
 BEAM_FEATURES: Final[int] = 3  # distance to orbit, sin, cos
-# Incoming beams kept; rarely more than this are on their way at once.
-BEAM_SLOTS: Final[int] = 16
+# Most beams incoming at once: 7 fire rolls in the 105 frames each is tracked,
+# times 3 cannons.
+BEAM_SLOTS: Final[int] = 21
 OBS_SIZE: Final[int] = PLANET_FEATURES + STAR_FEATURES + BEAM_SLOTS * BEAM_FEATURES
 
 
