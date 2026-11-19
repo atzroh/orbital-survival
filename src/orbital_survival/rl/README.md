@@ -96,9 +96,8 @@ for the seconds survived per round.
 
 `--seed` seeds Python's `random`, NumPy, PyTorch and the first round of each
 environment, so the same command repeats the same run. The star draws from
-Python's global `random`, which all environments share: with `--num-envs` 2 or
-more the run is still repeatable, but environment `i` does not replay the
-round that `evaluate` plays for seed `seed + i`.
+Python's global `random`, which all environments share, so with `--num-envs` 2
+or more the run is still repeatable.
 
 ### Resuming
 
@@ -116,7 +115,9 @@ instead of continuing near zero.
 
 ## Evaluation
 
-`evaluate` plays rounds seeded `0` to `--episodes - 1` with the model (acting
-greedily) and with a random policy, then prints the score and survival time
-of each. It also lists the seeds where the model lost within 60 seconds;
-`watch --seed N` replays one of those rounds again and again.
+`evaluate` plays `--episodes` rounds with the model (acting greedily) and with
+a random policy, then prints the score and survival time of each. The rounds
+are seeded counting down from `2**31 - 1` (2147483647), far from the small
+seeds given to `train`, so no evaluation round is one the model trained on.
+Each round is cut off at fifteen minutes. `watch --seed N` replays one of those
+rounds again and again.

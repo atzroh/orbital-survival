@@ -18,6 +18,7 @@ from orbital_survival.rl.paths import model_path
 type Policy = Callable[[Observation], np.int64]
 
 MAX_SECONDS = 15 * 60  # Cut off each round at fifteen minutes
+FIRST_SEED = 2**31 - 1  # Counts down, far from train's --seed
 
 
 def parse_args() -> argparse.Namespace:
@@ -42,7 +43,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def run_episodes(policy: Policy, episodes: int) -> list[tuple[int, float]]:
-    """Play seeded rounds 0..episodes-1 with a policy.
+    """Play seeded rounds counting down from FIRST_SEED with a policy.
 
     Args:
         policy: Maps an observation to an action.
@@ -53,7 +54,7 @@ def run_episodes(policy: Policy, episodes: int) -> list[tuple[int, float]]:
     """
     env = OrbitalSurvivalEnv(max_episode_frames=MAX_SECONDS * FPS)
     results = []
-    for seed in range(episodes):
+    for seed in range(FIRST_SEED, FIRST_SEED - episodes, -1):
         obs, info = env.reset(seed=seed)
         done = False
         while not done:
@@ -96,7 +97,8 @@ def main() -> None:
     rng = np.random.default_rng(0)
     random_results = run_episodes(lambda _: np.int64(rng.integers(3)), args.episodes)
 
-    print(f"{args.episodes} rounds each (seeds 0-{args.episodes - 1})")
+    last_seed = FIRST_SEED - args.episodes + 1
+    print(f"{args.episodes} rounds each (seeds {FIRST_SEED} down to {last_seed})")
     print("policy  score (mean/min/max)  survival s (mean/min/max)")
     print_row("model", model_results)
     print_row("random", random_results)
