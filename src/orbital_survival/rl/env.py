@@ -38,7 +38,7 @@ MAX_EPISODE_FRAMES: Final[int] = FPS * 120  # Cut off runs at two minutes
 PLANET_FEATURES: Final[int] = 1  # speed
 # speed, then sin/cos per cannon; only what a player can read off the screen
 STAR_FEATURES: Final[int] = 1 + 2 * CANNON_COUNT
-BEAM_FEATURES: Final[int] = 4  # present, distance to orbit, sin, cos
+BEAM_FEATURES: Final[int] = 3  # distance to orbit, sin, cos
 # Incoming beams kept; rarely more than this are on their way at once.
 BEAM_SLOTS: Final[int] = 16
 OBS_SIZE: Final[int] = PLANET_FEATURES + STAR_FEATURES + BEAM_SLOTS * BEAM_FEATURES
@@ -215,11 +215,12 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         ]
         incoming.sort(key=lambda b: b.radius, reverse=True)
         offset = PLANET_FEATURES + STAR_FEATURES
+        # Empty slots read as beams just leaving the star: as far as it gets.
+        obs[offset::BEAM_FEATURES] = 1.0
         for i, beam in enumerate(incoming[:BEAM_SLOTS]):
             beam_angle = planet.angle + beam.angle
             start = offset + i * BEAM_FEATURES
             obs[start : start + BEAM_FEATURES] = (
-                1.0,
                 # 1 as it leaves the star, 0 at the orbit, slightly negative
                 # while it crosses.
                 (PLANET_ORBIT_RADIUS - beam.radius) / (PLANET_ORBIT_RADIUS - STAR_SIZE),
