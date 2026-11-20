@@ -21,6 +21,7 @@ from orbital_survival.config import (
 from orbital_survival.entities.base import CelestialBody
 from orbital_survival.entities.star import CANNON_COUNT
 from orbital_survival.logic import Logic
+from orbital_survival.ui.graph import GraphRecorder, GraphWindow
 from orbital_survival.ui.hud import HUD, HUDState
 
 type Observation = npt.NDArray[np.float32]
@@ -78,6 +79,9 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         self.screen: pygame.Surface | None = None
         self.clock: pygame.time.Clock | None = None
         self.hud: HUD | None = None
+        # Telemetry graph beside the game; None until drawn or once closed.
+        self.graph: GraphWindow | None = None
+        self.recorder = GraphRecorder()
         # Set once the window is closed, so callers can stop.
         self.quit_requested = False
 
@@ -100,6 +104,10 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
             random.seed(seed)
         self.logic = Logic()
         self.prev_star_speed = self.logic.star.speed
+        # A fresh recorder per round, so the graph starts empty, as in PlayScene.
+        self.recorder = GraphRecorder()
+        if self.graph is not None:
+            self.graph.attach(self.recorder)
         if self.render_mode == "human":
             self.render()
         return self._observe(), self._info()
@@ -128,6 +136,11 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
             reward += SURVIVAL_REWARD
             # Every frame, not every step, so playback runs at game speed.
             if self.render_mode == "human":
+                self.recorder.record(
+                    speed=self.logic.planet.speed,
+                    acceleration=self.logic.planet.actual_acceleration,
+                    direction=self.logic.direction,
+                )
                 self.render()
             # Lives only tell whether a hit happened; the agent never sees them.
             hit = self.logic.lives < MAX_LIVES
@@ -139,18 +152,29 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         return self._observe(), reward, terminated, truncated, self._info()
 
     def render(self) -> None:
-        """Draw the current frame in a window, the way PlayScene does."""
+        """Draw the current frame in a window, the way PlayScene does, and the graph."""
         if self.screen is None:
             pygame.init()
             self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
             pygame.display.set_caption("ORBITAL SURVIVAL (AI)")
             self.clock = pygame.time.Clock()
             self.hud = HUD()
+            self.graph = GraphWindow()
+            self.graph.place_beside_game()
+            self.graph.attach(self.recorder)
         assert self.clock is not None and self.hud is not None
 
         # Drain events so the window stays responsive and can be closed.
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+            # Closing the graph closes only the graph, as in Game.
+            if (
+                self.graph is not None
+                and event.type == pygame.WINDOWCLOSE
+                and self.graph.owns(getattr(event, "window", None))
+            ):
+                self.graph.close()
+                self.graph = None
+            elif event.type == pygame.QUIT:
                 self.quit_requested = True
 
         self.screen.fill(BLACK)
@@ -169,10 +193,16 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
             ),
         )
         pygame.display.flip()
+        # After the flip, so a slow graph repaint never delays the game frame.
+        if self.graph is not None:
+            self.graph.draw()
         self.clock.tick(FPS)
 
     def close(self) -> None:
-        """Close the window, if one was opened."""
+        """Close the windows, if they were opened."""
+        if self.graph is not None:
+            self.graph.close()
+            self.graph = None
         if self.screen is not None:
             pygame.quit()
             self.screen = None
