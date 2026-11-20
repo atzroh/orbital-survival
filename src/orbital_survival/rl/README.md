@@ -20,6 +20,9 @@ uv run --group rl python -m orbital_survival.rl.train --name foo --seed 0
 # evaluate the model over fixed seeded rounds
 uv run --group rl python -m orbital_survival.rl.evaluate --name foo
 
+# evaluate a random policy over the same rounds, as a baseline
+uv run --group rl python -m orbital_survival.rl.evaluate --random
+
 # watch the model play in the game window
 uv run --group rl python -m orbital_survival.rl.watch --name foo
 
@@ -46,6 +49,8 @@ runs/foo
 ```
 
 `train` refuses a name that already exists, so a run is never overwritten.
+`runs/random/` holds only the `evaluation.json` of `evaluate --random`, so
+`random` cannot be used as a run name once it exists.
 
 ## Environment
 
@@ -129,3 +134,8 @@ switches. The shares are taken within each round and then averaged, so a long
 round counts no more than a short one. It also writes these figures, unrounded,
 with the result of every round to `evaluation.json` in the run folder, or to `evaluation_<steps>_steps.json`
 for a snapshot; evaluating the same model again overwrites it.
+
+`--random` in place of `--name` plays the same rounds with a policy that picks
+each action uniformly at random (its generator seeded with 0, so it repeats),
+and saves to `runs/random/evaluation.json` with `model_file` set to null. Use it
+as the baseline a trained model should beat.

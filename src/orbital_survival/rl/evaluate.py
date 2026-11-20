@@ -1,11 +1,13 @@
-"""Evaluate a trained model over fixed seeded rounds.
+"""Evaluate a trained model, or a random policy, over fixed seeded rounds.
 
-Run with `uv run --group rl python -m orbital_survival.rl.evaluate --name foo`.
+Run with `uv run --group rl python -m orbital_survival.rl.evaluate --name foo`,
+or with `--random` instead of `--name` for the random policy.
 """
 
 import argparse
 import json
 import sys
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from itertools import pairwise
 from statistics import mean, median
@@ -14,8 +16,10 @@ import numpy as np
 from stable_baselines3 import PPO
 
 from orbital_survival.config import FPS
-from orbital_survival.rl.env import OrbitalSurvivalEnv
-from orbital_survival.rl.paths import evaluation_path, model_path
+from orbital_survival.rl.env import Observation, OrbitalSurvivalEnv
+from orbital_survival.rl.paths import RANDOM_RUN, evaluation_path, model_path
+
+type Policy = Callable[[Observation], np.int64]
 
 MAX_SECONDS = 15 * 60  # Cut off each round at fifteen minutes
 FIRST_SEED = 2**31 - 1  # Counts down, far from train's --seed
@@ -39,25 +43,30 @@ def parse_args() -> argparse.Namespace:
         The parsed arguments.
     """
     parser = argparse.ArgumentParser(description="Evaluate a trained PPO agent.")
-    parser.add_argument(
-        "--name", required=True, help="run to load, the name given to train"
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("--name", help="run to load, the name given to train")
+    target.add_argument(
+        "--random",
+        action="store_true",
+        help=f"play a random policy instead, saving under runs/{RANDOM_RUN}",
     )
     parser.add_argument(
         "--steps",
         type=int,
         help="load the snapshot saved at this step count instead of the final model",
     )
-    parser.add_argument(
-        "--episodes", type=int, default=100, help="rounds to play per policy"
-    )
-    return parser.parse_args()
+    parser.add_argument("--episodes", type=int, default=100, help="rounds to play")
+    args = parser.parse_args()
+    if args.random and args.steps is not None:
+        parser.error("--steps needs --name")
+    return args
 
 
-def run_episodes(model: PPO, episodes: int) -> list[RoundResult]:
-    """Play seeded rounds counting down from FIRST_SEED with the model.
+def run_episodes(policy: Policy, episodes: int) -> list[RoundResult]:
+    """Play seeded rounds counting down from FIRST_SEED with a policy.
 
     Args:
-        model: The trained model.
+        policy: Maps an observation to an action.
         episodes: Number of rounds to play.
 
     Returns:
@@ -71,8 +80,7 @@ def run_episodes(model: PPO, episodes: int) -> list[RoundResult]:
         history: list[int] = []
         done = truncated = False
         while not done:
-            # Act greedily: no exploration noise, so this measures the real skill.
-            action = np.int64(model.predict(obs, deterministic=True)[0])
+            action = policy(obs)
             history.append(int(action))
             obs, _, terminated, truncated, info = env.step(action)
             done = terminated or truncated
@@ -93,14 +101,24 @@ def run_episodes(model: PPO, episodes: int) -> list[RoundResult]:
 
 
 def main() -> None:
-    """Evaluate the model, print a summary and save every round."""
+    """Evaluate the model or the random policy, print a summary and save it."""
     args = parse_args()
 
-    path = model_path(args.name, args.steps)
-    if not path.exists():
-        sys.exit(f"No model at {path}")
-    model = PPO.load(path, device="cpu")
-    rounds = run_episodes(model, args.episodes)
+    if args.random:
+        run, model_file = RANDOM_RUN, None
+        rng = np.random.default_rng(0)
+        rounds = run_episodes(lambda _: np.int64(rng.integers(3)), args.episodes)
+    else:
+        path = model_path(args.name, args.steps)
+        if not path.exists():
+            sys.exit(f"No model at {path}")
+        run, model_file = args.name, path.name
+        model = PPO.load(path, device="cpu")
+        rounds = run_episodes(
+            # Act greedily: no exploration noise, so this measures the real skill.
+            lambda obs: np.int64(model.predict(obs, deterministic=True)[0]),
+            args.episodes,
+        )
 
     sec = [r.seconds for r in rounds]
     cut_off = sum(r.cut_off for r in rounds)
@@ -137,14 +155,15 @@ def main() -> None:
     print(f"switches %  {s['switch_percent']:.0f}")
 
     record = {
-        "model_file": path.name,
+        "model_file": model_file,  # None for the random policy
         "episodes": args.episodes,
         "first_seed": FIRST_SEED,
         "max_seconds": MAX_SECONDS,
         "summary": summary,
         "rounds": [asdict(r) for r in rounds],
     }
-    out = evaluation_path(args.name, args.steps)
+    out = evaluation_path(run, args.steps)
+    out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(record, indent=2) + "\n")
     print(f"\nSaved to {out}")
 

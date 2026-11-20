@@ -9,6 +9,7 @@ MODEL_FILE: Final[str] = MODEL_NAME + ".zip"
 CONFIG_FILE: Final[str] = "config.json"
 PROGRESS_FILE: Final[str] = "progress.csv"
 EVALUATION_NAME: Final[str] = "evaluation"  # One JSON per evaluated model file
+RANDOM_RUN: Final[str] = "random"  # Folder for the random policy's evaluation
 
 
 def model_path(name: str, steps: int | None = None) -> Path:
