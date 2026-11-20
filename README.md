@@ -47,6 +47,11 @@ uv run ruff check --fix # lint
 uv run ruff format      # format
 ```
 
+## Reinforcement Learning
+
+An AI player can be trained with PPO and watched in the game window. See
+[src/orbital_survival/rl/README.md](src/orbital_survival/rl/README.md).
+
 ## Controls
 
 - Left arrow key: accelerate left
@@ -113,6 +118,12 @@ just ended is still readable on the game-over screen.
 │     ├── config.py            # tuning constants
 │     ├── game.py              # window, main loop, scene switching
 │     ├── logic.py             # physics, collisions, lives and scoring
+│     ├── rl                   # PPO agent; see its README.md
+│     │  ├── env.py            # Gymnasium environment
+│     │  ├── paths.py          # run folder layout under runs/
+│     │  ├── train.py
+│     │  ├── evaluate.py
+│     │  └── watch.py
 │     ├── entities
 │     │  ├── base.py           # CelestialBody / BaseArc
 │     │  ├── beam.py           # Beam, BeamCorpse
