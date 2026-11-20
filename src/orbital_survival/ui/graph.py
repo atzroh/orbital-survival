@@ -99,6 +99,7 @@ class GraphRecorder:
         Args:
             history_frames: Number of most recent frames to keep.
         """
+        self.history_frames = history_frames
         self.samples: deque[Sample] = deque(maxlen=history_frames)
 
     def record(self, speed: float, acceleration: float, direction: int) -> None:
@@ -207,8 +208,9 @@ class GraphWindow:
         self.surface.fill(BLACK)
 
         series = self.recorder.series() if self.recorder else ((), (), ())
+        slots = self.recorder.history_frames if self.recorder else GRAPH_HISTORY_FRAMES
         for index, (pane, values) in enumerate(zip(PANES, series, strict=True)):
-            self._draw_pane(pane, list(values), self._pane_rect(index))
+            self._draw_pane(pane, list(values), slots, self._pane_rect(index))
 
     def _pane_rect(self, index: int) -> pygame.Rect:
         """Return the plot area of the index-th pane, counting from the top.
@@ -228,23 +230,25 @@ class GraphWindow:
             height,
         )
 
-    def _draw_pane(self, pane: Pane, values: list[float], rect: pygame.Rect) -> None:
+    def _draw_pane(
+        self, pane: Pane, values: list[float], slots: int, rect: pygame.Rect
+    ) -> None:
         """Draw one pane: its zero line, its trace, then its label.
 
         Args:
             pane: How to label, scale and color the series.
             values: Raw samples, oldest first.
+            slots: Frames the full width holds, the recorder's history length.
             rect: Plot area of the pane.
         """
         pygame.draw.line(
             self.surface, GRAY, (rect.left, rect.centery), (rect.right, rect.centery)
         )
 
-        # A single sample has no line to draw, and dividing by `count - 1`
-        # below would fail on it.
+        # A single sample has no line to draw.
         if len(values) > 1:
             points = [
-                (self._x(index, len(values), rect), self._y(value, pane, rect))
+                (self._x(index, len(values), slots, rect), self._y(value, pane, rect))
                 for index, value in enumerate(values)
             ]
             pygame.draw.lines(self.surface, pane.color, False, points)
@@ -256,18 +260,23 @@ class GraphWindow:
             (rect.left + LABEL_INSET, rect.top + LABEL_INSET),
         )
 
-    def _x(self, index: int, count: int, rect: pygame.Rect) -> float:
-        """Map a sample's position in the history onto the pane's width.
+    def _x(self, index: int, count: int, slots: int, rect: pygame.Rect) -> float:
+        """Map a sample onto the pane's width, newest at the right edge.
+
+        Each frame takes a fixed width, so the trace scrolls at a steady pace
+        and a short history fills only the right part of the pane.
 
         Args:
             index: Sample position, oldest first.
-            count: Number of samples; at least 2.
+            count: Number of samples.
+            slots: Frames the full width holds; at least 2.
             rect: Plot area of the pane.
 
         Returns:
             Screen x coordinate.
         """
-        return rect.left + index * (rect.width - 1) / (count - 1)
+        age = count - 1 - index  # Frames before the newest sample
+        return rect.right - 1 - age * (rect.width - 1) / (slots - 1)
 
     def _y(self, value: float, pane: Pane, rect: pygame.Rect) -> float:
         """Map a value onto the pane's height, clamped to its bounds.
