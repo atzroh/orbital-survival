@@ -26,6 +26,9 @@ uv run --group rl python -m orbital_survival.rl.evaluate --name foo --all-steps
 # evaluate a random policy over the same rounds, as a baseline
 uv run --group rl python -m orbital_survival.rl.evaluate --random
 
+# list the saved evaluations of the run by step, beside the baseline
+uv run python -m orbital_survival.rl.report --name foo
+
 # watch the model play in the game window
 uv run --group rl python -m orbital_survival.rl.watch --name foo
 
@@ -48,7 +51,8 @@ runs/foo
 ├── config.json              # training conditions of each train invocation
 ├── progress.csv             # training log, one row per PPO update
 ├── events.out.tfevents.*    # the same log for TensorBoard
-└── evaluation.json          # evaluate results (evaluation_<steps>_steps.json for a snapshot)
+├── evaluation.json          # evaluate results (evaluation_<steps>_steps.json for a snapshot)
+└── report.csv               # every evaluation of the run by step, written by report
 ```
 
 `train` refuses a name that already exists, so a run is never overwritten.
@@ -158,3 +162,11 @@ own process with one PyTorch thread. It notes each snapshot as it finishes,
 prints a table by step
 at the end, and saves each to `evaluation_<steps>_steps.json` as if it
 had been evaluated alone with `--steps`.
+
+`report` reads those files back without evaluating anything, so it needs no
+`rl` group. It prints one line per snapshot in step order, then the final
+model and `runs/random` when they have been evaluated, and writes the same rows
+with every summary figure to `report.csv` in the run folder. It warns when
+the rows were not played over the same rounds (`episodes`, `first_seed`,
+`max_seconds`). It does not join `progress.csv`; read that separately when
+plotting the two together.

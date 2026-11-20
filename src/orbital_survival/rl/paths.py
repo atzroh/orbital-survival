@@ -9,6 +9,7 @@ MODEL_FILE: Final[str] = MODEL_NAME + ".zip"
 CONFIG_FILE: Final[str] = "config.json"
 PROGRESS_FILE: Final[str] = "progress.csv"
 EVALUATION_NAME: Final[str] = "evaluation"  # One JSON per evaluated model file
+REPORT_FILE: Final[str] = "report.csv"  # Every evaluation of a run, by step
 RANDOM_RUN: Final[str] = "random"  # Folder for the random policy's evaluation
 
 
@@ -50,5 +51,19 @@ def snapshot_steps(name: str) -> list[int]:
         The step counts, from the model_<steps>_steps.zip files.
     """
     prefix, suffix = f"{MODEL_NAME}_", "_steps.zip"
+    files = (RUNS_DIR / name).glob(f"{prefix}*{suffix}")
+    return sorted(int(f.name.removeprefix(prefix).removesuffix(suffix)) for f in files)
+
+
+def evaluated_steps(name: str) -> list[int]:
+    """Step counts of the snapshots a run has evaluations for, in order.
+
+    Args:
+        name: Run name, the folder under RUNS_DIR.
+
+    Returns:
+        The step counts, from the evaluation_<steps>_steps.json files.
+    """
+    prefix, suffix = f"{EVALUATION_NAME}_", "_steps.json"
     files = (RUNS_DIR / name).glob(f"{prefix}*{suffix}")
     return sorted(int(f.name.removeprefix(prefix).removesuffix(suffix)) for f in files)
