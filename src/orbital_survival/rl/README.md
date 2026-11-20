@@ -134,7 +134,13 @@ many rounds reached the cut-off, the share of each action and how often the
 action switches. The interval comes from a BCa bootstrap (SciPy, 10,000
 resamples with a fixed seed), which suits the long right tail of survival
 times better than a t interval. The shares are taken within each round and then averaged, so a long
-round counts no more than a short one. It also writes these figures, unrounded,
+round counts no more than a short one.
+
+It also prints how hesitant the policy is, from the action probabilities at
+each step: their entropy, which reaches ln 3 (1.10) when all three actions are
+equally likely, and the margin between the two most likely actions. These are
+averaged within each round and then over rounds, like the shares. The random
+policy picks uniformly, so it scores ln 3 and 0. It also writes these figures, unrounded,
 with the result of every round to `evaluation.json` in the run folder, or to `evaluation_<steps>_steps.json`
 for a snapshot; evaluating the same model again overwrites it.
 
