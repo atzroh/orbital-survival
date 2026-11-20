@@ -20,6 +20,9 @@ uv run --group rl python -m orbital_survival.rl.train --name foo --seed 0
 # evaluate the model over fixed seeded rounds
 uv run --group rl python -m orbital_survival.rl.evaluate --name foo
 
+# evaluate every snapshot of the run, several at once
+uv run --group rl python -m orbital_survival.rl.evaluate --name foo --all-steps
+
 # evaluate a random policy over the same rounds, as a baseline
 uv run --group rl python -m orbital_survival.rl.evaluate --random
 
@@ -148,3 +151,10 @@ for a snapshot; evaluating the same model again overwrites it.
 each action uniformly at random (its generator seeded with 0, so it repeats),
 and saves to `runs/random/evaluation.json` with `model_file` set to null. Use it
 as the baseline a trained model should beat.
+
+`--all-steps` evaluates every `model_<steps>_steps.zip` snapshot of the run
+instead of the final model, as many at once as there are CPUs, each in its
+own process with one PyTorch thread. It notes each snapshot as it finishes,
+prints a table by step
+at the end, and saves each to `evaluation_<steps>_steps.json` as if it
+had been evaluated alone with `--steps`.

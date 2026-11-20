@@ -38,3 +38,17 @@ def evaluation_path(name: str, steps: int | None = None) -> Path:
     """
     suffix = "" if steps is None else f"_{steps}_steps"
     return RUNS_DIR / name / f"{EVALUATION_NAME}{suffix}.json"
+
+
+def snapshot_steps(name: str) -> list[int]:
+    """Step counts of the snapshots a run saved, in order.
+
+    Args:
+        name: Run name, the folder under RUNS_DIR.
+
+    Returns:
+        The step counts, from the model_<steps>_steps.zip files.
+    """
+    prefix, suffix = f"{MODEL_NAME}_", "_steps.zip"
+    files = (RUNS_DIR / name).glob(f"{prefix}*{suffix}")
+    return sorted(int(f.name.removeprefix(prefix).removesuffix(suffix)) for f in files)
