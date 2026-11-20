@@ -65,7 +65,8 @@ def run_episodes(model: PPO, episodes: int) -> list[RoundResult]:
     """
     env = OrbitalSurvivalEnv(max_episode_frames=MAX_SECONDS * FPS)
     results = []
-    for seed in range(FIRST_SEED, FIRST_SEED - episodes, -1):
+    width = len(str(episodes))
+    for i, seed in enumerate(range(FIRST_SEED, FIRST_SEED - episodes, -1), 1):
         obs, info = env.reset(seed=seed)
         history: list[int] = []
         done = truncated = False
@@ -75,14 +76,18 @@ def run_episodes(model: PPO, episodes: int) -> list[RoundResult]:
             history.append(int(action))
             obs, _, terminated, truncated, info = env.step(action)
             done = terminated or truncated
-        results.append(
-            RoundResult(
-                seed=seed,
-                seconds=info["frames"] / FPS,
-                cut_off=truncated,
-                actions=tuple(history.count(i) for i in range(3)),
-                switches=sum(a != b for a, b in pairwise(history)),
-            )
+        result = RoundResult(
+            seed=seed,
+            seconds=info["frames"] / FPS,
+            cut_off=truncated,
+            actions=tuple(history.count(a) for a in range(3)),
+            switches=sum(a != b for a, b in pairwise(history)),
+        )
+        results.append(result)
+        cut = "  cut off" if result.cut_off else ""
+        print(
+            f"round {i:>{width}}/{episodes}  seed {seed}  {result.seconds:.1f} s{cut}",
+            flush=True,
         )
     return results
 
@@ -117,7 +122,7 @@ def main() -> None:
     }
 
     last_seed = FIRST_SEED - args.episodes + 1
-    print(f"{args.episodes} rounds (seeds {FIRST_SEED} down to {last_seed})")
+    print(f"\n{args.episodes} rounds (seeds {FIRST_SEED} down to {last_seed})")
     s = summary
     print(
         f"survival s  mean {s['seconds_mean']:.1f}"
