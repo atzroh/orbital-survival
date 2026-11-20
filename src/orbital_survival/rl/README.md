@@ -17,7 +17,7 @@ uv sync --group rl
 # train a run named foo (--name and --seed are required)
 uv run --group rl python -m orbital_survival.rl.train --name foo --seed 0
 
-# compare the model with a random policy over seeded rounds
+# evaluate the model over fixed seeded rounds
 uv run --group rl python -m orbital_survival.rl.evaluate --name foo
 
 # watch the model play in the game window
@@ -41,7 +41,8 @@ runs/foo
 ├── model_100000_steps.zip   # snapshot every --checkpoint-every steps
 ├── config.json              # training conditions of each train invocation
 ├── progress.csv             # training log, one row per PPO update
-└── events.out.tfevents.*    # the same log for TensorBoard
+├── events.out.tfevents.*    # the same log for TensorBoard
+└── evaluation.json          # evaluate results (evaluation_<steps>_steps.json for a snapshot)
 ```
 
 `train` refuses a name that already exists, so a run is never overwritten.
@@ -115,9 +116,16 @@ instead of continuing near zero.
 
 ## Evaluation
 
-`evaluate` plays `--episodes` rounds with the model (acting greedily) and with
-a random policy, then prints the score and survival time of each. The rounds
+`evaluate` plays `--episodes` rounds with the model, acting greedily, and
+prints its survival time. The rounds
 are seeded counting down from `2**31 - 1` (2147483647), far from the small
 seeds given to `train`, so no evaluation round is one the model trained on.
 Each round is cut off at fifteen minutes. `watch --seed N` replays one of those
 rounds again and again.
+
+Besides the mean, min and max, it prints the median survival time, how many
+rounds reached the cut-off, the share of each action and how often the action
+switches. The shares are taken within each round and then averaged, so a long
+round counts no more than a short one. It also writes these figures, unrounded,
+with the result of every round to `evaluation.json` in the run folder, or to `evaluation_<steps>_steps.json`
+for a snapshot; evaluating the same model again overwrites it.
