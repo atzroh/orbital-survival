@@ -10,9 +10,10 @@ import sys
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from itertools import pairwise
-from statistics import mean, median
+from statistics import mean, quantiles, stdev
 
 import numpy as np
+from scipy.stats import bootstrap
 from stable_baselines3 import PPO
 
 from orbital_survival.config import FPS
@@ -23,6 +24,7 @@ type Policy = Callable[[Observation], np.int64]
 
 MAX_SECONDS = 15 * 60  # Cut off each round at fifteen minutes
 FIRST_SEED = 2**31 - 1  # Counts down, far from train's --seed
+BOOTSTRAP_RESAMPLES = 10_000  # Resamples for the confidence interval of the mean
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +61,8 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.random and args.steps is not None:
         parser.error("--steps needs --name")
+    if args.episodes < 2:
+        parser.error("--episodes must be at least 2 for the spread statistics")
     return args
 
 
@@ -122,6 +126,16 @@ def main() -> None:
 
     sec = [r.seconds for r in rounds]
     cut_off = sum(r.cut_off for r in rounds)
+    q1, q2, q3 = quantiles(sec, n=4, method="inclusive")
+    # BCa corrects for the long right tail of survival times.
+    ci = bootstrap(
+        (sec,),
+        np.mean,
+        n_resamples=BOOTSTRAP_RESAMPLES,
+        method="BCa",
+        rng=np.random.default_rng(0),
+    ).confidence_interval
+    low, high = float(ci.low), float(ci.high)
     # Shares within each round, averaged so every round counts the same.
     noop, left, right = (
         mean(r.actions[i] * 100 / sum(r.actions) for r in rounds) for i in range(3)
@@ -129,9 +143,11 @@ def main() -> None:
     switches = mean(r.switches * 100 / sum(r.actions) for r in rounds)
     summary = {
         "seconds_mean": mean(sec),
-        "seconds_median": median(sec),
+        "seconds_mean_ci95": [low, high],
+        "seconds_std": stdev(sec),
         "seconds_min": min(sec),
         "seconds_max": max(sec),
+        "seconds_quartiles": [q1, q2, q3],
         "cut_off": cut_off,
         "noop_percent": noop,
         "left_percent": left,
@@ -144,9 +160,10 @@ def main() -> None:
     s = summary
     print(
         f"survival s  mean {s['seconds_mean']:.1f}"
-        + f"  median {s['seconds_median']:.1f}"
+        + f"  95% CI {low:.1f}-{high:.1f}  std {s['seconds_std']:.1f}"
         + f"  min {s['seconds_min']:.1f}  max {s['seconds_max']:.1f}"
     )
+    print(f"quartiles   q1 {q1:.1f}  median {q2:.1f}  q3 {q3:.1f}")
     print(f"cut off     {s['cut_off']}/{len(rounds)}")
     print(
         f"actions %   noop {s['noop_percent']:.0f}"

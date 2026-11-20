@@ -128,9 +128,12 @@ seeds given to `train`, so no evaluation round is one the model trained on.
 Each round is cut off at fifteen minutes. `watch --seed N` replays one of those
 rounds again and again.
 
-Besides the mean, min and max, it prints the median survival time, how many
-rounds reached the cut-off, the share of each action and how often the action
-switches. The shares are taken within each round and then averaged, so a long
+Besides the mean, min and max, it prints the median survival time, its
+standard deviation and quartiles, a 95% confidence interval for the mean, how
+many rounds reached the cut-off, the share of each action and how often the
+action switches. The interval comes from a BCa bootstrap (SciPy, 10,000
+resamples with a fixed seed), which suits the long right tail of survival
+times better than a t interval. The shares are taken within each round and then averaged, so a long
 round counts no more than a short one. It also writes these figures, unrounded,
 with the result of every round to `evaluation.json` in the run folder, or to `evaluation_<steps>_steps.json`
 for a snapshot; evaluating the same model again overwrites it.
