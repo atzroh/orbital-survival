@@ -29,7 +29,7 @@ uv run --group rl python -m orbital_survival.rl.evaluate --random
 # list the saved evaluations of the run by step, beside the baseline
 uv run python -m orbital_survival.rl.report --name foo
 
-# watch the model play in the game window
+# watch the model play in the game window, with the telemetry graph beside it
 uv run --group rl python -m orbital_survival.rl.watch --name foo
 
 # plot the training curves of every run in the browser
@@ -39,6 +39,11 @@ uv run --group rl tensorboard --logdir runs
 `evaluate` and `watch` load `runs/<name>/model.zip`; add `--steps 500000` to
 load the snapshot saved at that step count instead. Every script prints all of
 its options with `--help`.
+
+`watch` always opens the telemetry graph of the game's `--graph` (see the
+top-level README) beside the game window, starting empty each round. Closing
+the graph leaves the model playing. Only the window draws it, so training and
+evaluation are unaffected.
 
 ## Run Folder
 
