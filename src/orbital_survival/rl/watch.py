@@ -11,7 +11,7 @@ from stable_baselines3 import PPO
 
 from orbital_survival.config import FPS
 from orbital_survival.rl.env import OrbitalSurvivalEnv
-from orbital_survival.rl.paths import latest_steps, model_path
+from orbital_survival.rl.paths import RUNS_DIR, latest_steps, model_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -43,7 +43,7 @@ def main() -> None:
 
     steps = args.steps if args.steps is not None else latest_steps(args.name)
     if steps is None:
-        sys.exit(f"No snapshots in {model_path(args.name).parent}")
+        sys.exit(f"No snapshots in {RUNS_DIR / args.name}")
     path = model_path(args.name, steps)
     if not path.exists():
         sys.exit(f"No model at {path}")
