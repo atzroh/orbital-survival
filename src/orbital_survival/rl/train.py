@@ -59,7 +59,7 @@ def parse_args() -> argparse.Namespace:
         "--timesteps",
         type=int,
         default=1_000_000,
-        help="agent steps to train (on top of the saved ones with --resume)",
+        help="agent steps each run ends at; --resume trains up to it",
     )
     parser.add_argument(
         "--checkpoint-every",
@@ -208,20 +208,24 @@ def ppo_settings(model: PPO) -> dict[str, Any]:
     }
 
 
-def save_run_record(run_dir: Path, args: argparse.Namespace, model: PPO) -> None:
+def save_run_record(
+    run_dir: Path, args: argparse.Namespace, model: PPO, start: int
+) -> None:
     """Append the conditions of this invocation to the record in the run folder.
 
     Args:
         run_dir: The run folder.
         args: The parsed arguments.
         model: The model about to train.
+        start: Step count the training starts from.
     """
     path = run_dir / CONFIG_FILE
     history = json.loads(path.read_text()) if path.exists() else []
     history.append(
         {
             "train": {
-                "timesteps": args.timesteps,
+                "from_steps": start,
+                "timesteps": args.timesteps - start,  # Steps trained this time
                 "torch_threads": args.torch_threads,
             },
             "ppo": ppo_settings(model),
@@ -260,6 +264,10 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> None:
     """
     tag = f"[s{seed}] "
     run_dir = run_dir_of(args.name, seed)
+    start = (latest_steps(run_dir.name) or 0) if args.resume else 0
+    if start >= args.timesteps:
+        print(f"{tag}Already at {start} steps", flush=True)
+        return
     torch.set_num_threads(args.torch_threads)
     env = make_vec_env(OrbitalSurvivalEnv, n_envs=args.num_envs)
     initial_lr: float = args.learning_rate
@@ -278,9 +286,7 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> None:
     learning_rate = linear_lr if args.linear_lr else initial_lr
     # A small MLP trains faster on the CPU than on a GPU.
     if args.resume:
-        steps = latest_steps(run_dir.name)
-        assert steps is not None  # main checked it
-        path = model_path(run_dir.name, steps)
+        path = model_path(run_dir.name, start)
         model = PPO.load(path, env=env, device="cpu", seed=seed)
     else:
         model = PPO(
@@ -298,7 +304,7 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> None:
             device="cpu",
         )
     run_dir.mkdir(parents=True, exist_ok=True)
-    save_run_record(run_dir, args, model)
+    save_run_record(run_dir, args, model, start)
     # The console table unless quiet, plus CSV and TensorBoard copies to keep.
     console = [] if quiet else [HumanOutputFormat(sys.stdout)]
     model.set_logger(
@@ -321,7 +327,7 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> None:
     print(f"{tag}Training in {run_dir}", flush=True)
     # Without a reset the step count, and so checkpoint names, carry on.
     model.learn(
-        total_timesteps=args.timesteps,
+        total_timesteps=args.timesteps - start,
         callback=checkpoint,
         reset_num_timesteps=not args.resume,
     )

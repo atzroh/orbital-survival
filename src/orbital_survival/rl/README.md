@@ -108,7 +108,8 @@ hyperparameters (`--net-arch`, `--learning-rate`, `--gamma`, ...) apply to a
 new model only.
 
 Before training starts, `train` appends its conditions to `config.json`: the
-steps it trains for, its PyTorch threads, and the PPO settings the model
+step count it starts from (`from_steps`) and the steps it trains for
+(`timesteps`), its PyTorch threads, and the PPO settings the model
 actually trains with, SB3 defaults included. A resumed run adds an entry of its own, so the first
 entry always shows how the model was created.
 
@@ -142,7 +143,10 @@ or more the run is still repeatable.
 
 `--name foo --seed 0 --resume` continues the newest snapshot of `runs/foo_s0/`
 in the same folder, keeping its weights, optimizer state, step count and
-hyperparameters; `--timesteps` is added on top. Snapshot names carry on the
+hyperparameters. `--timesteps` is the step count the run ends at, not the
+steps to add: a run with snapshots up to 5M, resumed with `--timesteps
+10000000`, trains 5M more. A seed already there is left alone, so after Ctrl+C
+the same command brings every seed to the same step. Snapshot names carry on the
 step count, and the logs carry on too: `progress.csv` gets the new rows under
 the same header, and TensorBoard draws one continuous curve.
 
@@ -155,7 +159,7 @@ past the last snapshot are lost.
 
 Models trained with `--linear-lr` are not meant to be resumed. The saved
 schedule is recomputed against the new total, so resuming a finished 1M-step
-run for another 1M steps restarts the learning rate at half its initial value
+run up to 2M restarts the learning rate at half its initial value
 instead of continuing near zero.
 
 ## Evaluation
