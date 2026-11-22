@@ -70,6 +70,11 @@ def parse_args() -> argparse.Namespace:
         help=f"play a random policy instead, saving under runs/{RANDOM_RUN}",
     )
     parser.add_argument("--episodes", type=int, default=100, help="rounds to play")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="evaluate again the snapshots already evaluated",
+    )
     args = parser.parse_args()
     if args.episodes < 2:
         parser.error("--episodes must be at least 2 for the spread statistics")
@@ -243,25 +248,30 @@ def evaluate_snapshot(name: str, steps: int, episodes: int) -> dict[str, Any]:
     return summary
 
 
-def evaluate_all_steps(name: str, episodes: int) -> None:
-    """Evaluate every snapshot of a run in parallel, then list them by step.
+def evaluate_all_steps(name: str, episodes: int, force: bool) -> None:
+    """Evaluate the snapshots of a run in parallel, then list them by step.
 
     Args:
         name: Run name.
         episodes: Number of rounds per snapshot.
+        force: Evaluate again the snapshots already evaluated.
     """
     all_steps = snapshot_steps(name)
     if not all_steps:
         sys.exit(f"No snapshots in {model_path(name).parent}")
+    todo = [s for s in all_steps if force or not evaluation_path(name, s).exists()]
     jobs = os.cpu_count() or 1
-    print(f"{len(all_steps)} snapshots, {episodes} rounds each, {jobs} at once")
+    print(
+        f"{len(todo)} of {len(all_steps)} snapshots to evaluate,"
+        + f" {episodes} rounds each, {jobs} at once"
+    )
     summaries = {}
     # spawn, not fork: forking after torch has started its threads can hang.
     context = multiprocessing.get_context("spawn")
     with ProcessPoolExecutor(jobs, mp_context=context) as pool:
         futures = {
             pool.submit(evaluate_snapshot, name, steps, episodes): steps
-            for steps in all_steps
+            for steps in todo
         }
         for future in as_completed(futures):
             steps = futures[future]
@@ -269,7 +279,7 @@ def evaluate_all_steps(name: str, episodes: int) -> None:
             print(f"done  steps {steps}", flush=True)
 
     print(f"\n{episodes} rounds each (seeds {FIRST_SEED} down)")
-    for steps in all_steps:
+    for steps in todo:
         s = summaries[steps]
         low, high = s["seconds_mean_ci95"]
         print(
@@ -284,7 +294,7 @@ def main() -> None:
     """Evaluate the run's snapshots, or the random policy, and save the results."""
     args = parse_args()
     if not args.random:
-        evaluate_all_steps(args.name, args.episodes)
+        evaluate_all_steps(args.name, args.episodes, args.force)
         return
 
     rng = np.random.default_rng(0)

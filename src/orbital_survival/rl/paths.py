@@ -9,7 +9,6 @@ MODEL_FILE: Final[str] = MODEL_NAME + ".zip"
 CONFIG_FILE: Final[str] = "config.json"
 PROGRESS_FILE: Final[str] = "progress.csv"
 EVALUATION_NAME: Final[str] = "evaluation"  # One JSON per evaluated model file
-REPORT_FILE: Final[str] = "report.csv"  # Every evaluation of a run, by step
 RANDOM_RUN: Final[str] = "random"  # Folder for the random policy's evaluation
 
 

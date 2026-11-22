@@ -26,9 +26,6 @@ uv run --group rl python -m orbital_survival.rl.evaluate --name foo_s0
 # evaluate a random policy over the same rounds, as a baseline
 uv run --group rl python -m orbital_survival.rl.evaluate --random
 
-# list the saved evaluations of the run by step, beside the baseline
-uv run python -m orbital_survival.rl.report --name foo_s0
-
 # watch the model play in the game window, with the telemetry graph beside it
 uv run --group rl python -m orbital_survival.rl.watch --name foo_s0
 
@@ -58,8 +55,7 @@ runs/foo_s0
 ├── config.json              # training conditions of each train invocation
 ├── progress.csv             # training log, one row per PPO update
 ├── events.out.tfevents.*    # the same log for TensorBoard
-├── evaluation_<steps>_steps.json  # evaluate results of each snapshot
-└── report.csv               # every evaluation of the run by step, written by report
+└── evaluation_<steps>_steps.json  # evaluate results of each snapshot
 ```
 
 `train` refuses a name that already exists, so a run is never overwritten.
@@ -163,8 +159,10 @@ instead of continuing near zero.
 
 `evaluate` plays `--episodes` rounds with every `model_<steps>_steps.zip`
 snapshot of the run, acting greedily, as many snapshots at once as there are
-CPUs, each in its own process with one PyTorch thread. It notes each snapshot
-as it finishes and prints a table by step at the end. The rounds
+CPUs, each in its own process with one PyTorch thread. Snapshots evaluated
+before are skipped, so after `--resume` only the new ones are played;
+`--force` plays them all again. It notes each snapshot as it finishes and
+prints a table of them by step at the end. The rounds
 are seeded counting down from `2**31 - 1` (2147483647), far from the small
 seeds given to `train`, so no evaluation round is one the model trained on.
 Each round is cut off at fifteen minutes. `watch --seed N` replays one of those
@@ -191,11 +189,3 @@ run folder. Evaluating the run again overwrites them.
 each action uniformly at random (its generator seeded with 0, so it repeats),
 prints every figure, and saves to `runs/random/evaluation.json` with
 `model_file` set to null. Use it as the baseline a trained model should beat.
-
-`report` reads those files back without evaluating anything, so it needs no
-`rl` group. It prints one line per snapshot in step order, then
-`runs/random` when it has been evaluated, and writes the same rows
-with every summary figure to `report.csv` in the run folder. It warns when
-the rows were not played over the same rounds (`episodes`, `first_seed`,
-`max_seconds`). It does not join `progress.csv`; read that separately when
-plotting the two together.
