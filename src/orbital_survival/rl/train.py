@@ -7,6 +7,7 @@ give several seeds, as in `--seed 0 1 2`, to train them in parallel.
 import argparse
 import json
 import multiprocessing
+import signal
 import sys
 from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor, wait
@@ -346,7 +347,14 @@ def main() -> None:
     print(f"{len(args.seed)} seeds, {jobs} at once", flush=True)
     # spawn, not fork: forking after torch has started its threads can hang.
     context = multiprocessing.get_context("spawn")
-    with ProcessPoolExecutor(jobs, mp_context=context) as pool:
+    # Ctrl+C kills the workers; a KeyboardInterrupt would start the next seed.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    with ProcessPoolExecutor(
+        jobs,
+        mp_context=context,
+        initializer=signal.signal,
+        initargs=(signal.SIGINT, signal.SIG_DFL),
+    ) as pool:
         futures: dict[int, Future[None]] = {
             seed: pool.submit(train_seed, args, seed, quiet) for seed in args.seed
         }
