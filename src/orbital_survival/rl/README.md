@@ -27,6 +27,9 @@ uv run --group rl python -m orbital_survival.rl.evaluate --name foo --seed 0 1 2
 # evaluate a random policy over the same rounds, as a baseline
 uv run --group rl python -m orbital_survival.rl.evaluate --random
 
+# average every run over its seeds, by condition and step, into runs/summary.csv
+uv run python -m orbital_survival.rl.summarize
+
 # watch the model play in the game window, with the telemetry graph beside it
 uv run --group rl python -m orbital_survival.rl.watch --name foo_s0
 
@@ -190,3 +193,14 @@ run folder; `--force` overwrites them.
 each action uniformly at random (its generator seeded with 0, so it repeats),
 prints every figure, and saves to `runs/random/evaluation.json` with
 `model_file` set to null. Use it as the baseline a trained model should beat.
+
+## Summary
+
+`summarize` reads every `evaluation_<steps>_steps.json` under `runs/` without
+evaluating anything, so it needs no `rl` group. It groups the runs by
+condition, the run name without its `_s<seed>`, and writes one row per
+condition and step to `runs/summary.csv`: the number of seeds evaluated at
+that step, the mean, standard deviation (empty with one seed), min and max of
+their `seconds_mean`, and the mean of their median survival time and of
+their `entropy_mean`. The last row holds
+`runs/random` when it has been evaluated.

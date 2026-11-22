@@ -123,6 +123,7 @@ just ended is still readable on the game-over screen.
 │     │  ├── paths.py          # run folder layout under runs/
 │     │  ├── train.py
 │     │  ├── evaluate.py
+│     │  ├── summarize.py      # seeds averaged by condition and step
 │     │  └── watch.py
 │     ├── entities
 │     │  ├── base.py           # CelestialBody / BaseArc
