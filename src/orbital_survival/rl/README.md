@@ -14,28 +14,33 @@ uv sync --group rl
 ## Run
 
 ```bash
-# train a run named foo (--name and --seed are required)
+# train a run named foo with seed 0, saved under runs/foo_s0 (--name and --seed are required)
 uv run --group rl python -m orbital_survival.rl.train --name foo --seed 0
 
+# train seeds 0-4 as runs/foo_s0 ... runs/foo_s4, three at a time
+uv run --group rl python -m orbital_survival.rl.train --name foo --seed 0 1 2 3 4 --jobs 3
+
 # evaluate the model over fixed seeded rounds
-uv run --group rl python -m orbital_survival.rl.evaluate --name foo
+uv run --group rl python -m orbital_survival.rl.evaluate --name foo_s0
 
 # evaluate every snapshot of the run, several at once
-uv run --group rl python -m orbital_survival.rl.evaluate --name foo --all-steps
+uv run --group rl python -m orbital_survival.rl.evaluate --name foo_s0 --all-steps
 
 # evaluate a random policy over the same rounds, as a baseline
 uv run --group rl python -m orbital_survival.rl.evaluate --random
 
 # list the saved evaluations of the run by step, beside the baseline
-uv run python -m orbital_survival.rl.report --name foo
+uv run python -m orbital_survival.rl.report --name foo_s0
 
 # watch the model play in the game window, with the telemetry graph beside it
-uv run --group rl python -m orbital_survival.rl.watch --name foo
+uv run --group rl python -m orbital_survival.rl.watch --name foo_s0
 
 # plot the training curves of every run in the browser
 uv run --group rl tensorboard --logdir runs
 ```
 
+`train` saves each seed under `runs/<name>_s<seed>/`, even when only one seed
+is given; the other scripts take that folder name as `--name`.
 `evaluate` and `watch` load `runs/<name>/model.zip`; add `--steps 500000` to
 load the snapshot saved at that step count instead. Every script prints all of
 its options with `--help`.
@@ -47,10 +52,11 @@ evaluation are unaffected.
 
 ## Run Folder
 
-Each run keeps everything under `runs/<name>/` (ignored by git):
+Each run keeps everything under `runs/<name>/` (ignored by git), where
+`train` names it `<name>_s<seed>`:
 
 ```text
-runs/foo
+runs/foo_s0
 ├── model.zip                # final model
 ├── model_100000_steps.zip   # snapshot every --checkpoint-every steps
 ├── config.json              # training conditions of each train invocation
@@ -61,6 +67,7 @@ runs/foo
 ```
 
 `train` refuses a name that already exists, so a run is never overwritten.
+With several seeds it checks them all first and starts none if one exists.
 `runs/random/` holds only the `evaluation.json` of `evaluate --random`, so
 `random` cannot be used as a run name once it exists.
 
@@ -106,20 +113,35 @@ steps it trains for, its PyTorch threads, and the PPO settings the model
 actually trains with, SB3 defaults included. A resumed run adds an entry of its own, so the first
 entry always shows how the model was created.
 
-The training log goes to the console as before, and to `progress.csv` and
+The training log goes to the console, and to `progress.csv` and
 TensorBoard. `rollout/ep_len_mean` is the one to watch: multiply it by 8 / 120
 for the seconds survived per round.
+
+### Several Seeds
+
+`--seed 0 1 2` trains each seed in its own process, `--jobs` of them at once
+(5 by default, where the total speed levels off on a 4-core CPU); the rest
+start as others finish. With two or more
+seeds the console shows one line per run start, snapshot and save instead of
+the table, which would interleave; `progress.csv` and TensorBoard are written
+as with one seed. Each process gets `--torch-threads` PyTorch threads. A seed
+that fails does not stop the others, and `train` lists every seed's outcome at
+the end, exiting with an error if one failed.
+
+Ctrl+C stops every running seed at its next step and saves its `model.zip`, so
+`--resume` can carry on; seeds not started yet are skipped.
 
 ### Reproducibility
 
 `--seed` seeds Python's `random`, NumPy, PyTorch and the first round of each
-environment, so the same command repeats the same run. The star draws from
+environment, so the same command repeats the same run. Training seeds in
+parallel gives the same run as training each alone. The star draws from
 Python's global `random`, which all environments share, so with `--num-envs` 2
 or more the run is still repeatable.
 
 ### Resuming
 
-`--name foo --resume` continues `runs/foo/model.zip` in the same folder,
+`--name foo --seed 0 --resume` continues `runs/foo_s0/model.zip` in the same folder,
 keeping its weights, optimizer state, step count and hyperparameters;
 `--timesteps` is added on top. Snapshot names carry on the step count, and the
 logs carry on too: `progress.csv` gets the new rows under the same header, and
