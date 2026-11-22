@@ -1,8 +1,8 @@
 """Evaluate every snapshot of a run, or a random policy, over fixed seeded rounds.
 
-Run with `uv run --group rl python -m orbital_survival.rl.evaluate --name foo`
-to evaluate the snapshots in parallel, or with `--random` instead of `--name`
-for the random policy.
+Run with `uv run --group rl python -m orbital_survival.rl.evaluate --name foo
+--seed 0 1 2` to evaluate the snapshots of runs foo_s0 to foo_s2 in parallel,
+or with `--random` instead of `--name` for the random policy.
 """
 
 import argparse
@@ -28,8 +28,10 @@ from orbital_survival.config import FPS
 from orbital_survival.rl.env import Observation, OrbitalSurvivalEnv
 from orbital_survival.rl.paths import (
     RANDOM_RUN,
+    RUNS_DIR,
     evaluation_path,
     model_path,
+    run_name,
     snapshot_steps,
 )
 
@@ -63,11 +65,17 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description="Evaluate a trained PPO agent.")
     target = parser.add_mutually_exclusive_group(required=True)
-    target.add_argument("--name", help="run whose snapshots to evaluate")
+    target.add_argument("--name", help="the --name given to train; needs --seed")
     target.add_argument(
         "--random",
         action="store_true",
         help=f"play a random policy instead, saving under runs/{RANDOM_RUN}",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        nargs="+",
+        help="seeds of the runs to evaluate, <name>_s<seed> each",
     )
     parser.add_argument("--episodes", type=int, default=100, help="rounds to play")
     parser.add_argument(
@@ -76,6 +84,8 @@ def parse_args() -> argparse.Namespace:
         help="evaluate again the snapshots already evaluated",
     )
     args = parser.parse_args()
+    if (args.name is None) != (args.seed is None):
+        parser.error("--name and --seed go together")
     if args.episodes < 2:
         parser.error("--episodes must be at least 2 for the spread statistics")
     return args
@@ -226,16 +236,13 @@ def save(
     return out
 
 
-def evaluate_snapshot(name: str, steps: int, episodes: int) -> dict[str, Any]:
+def evaluate_snapshot(name: str, steps: int, episodes: int) -> None:
     """Evaluate one snapshot quietly and save it; run in a worker process.
 
     Args:
         name: Run name.
         steps: Step count of the snapshot.
         episodes: Number of rounds to play.
-
-    Returns:
-        The statistics from summarize.
     """
     # The workers already share the CPUs; more threads only contend.
     torch.set_num_threads(1)
@@ -243,58 +250,44 @@ def evaluate_snapshot(name: str, steps: int, episodes: int) -> dict[str, Any]:
     model = PPO.load(path, device="cpu")
     # Act greedily: no exploration noise, so this measures the real skill.
     rounds = run_episodes(greedy_policy(model), episodes)
-    summary = summarize(rounds)
-    save(name, steps, path.name, rounds, summary)
-    return summary
+    save(name, steps, path.name, rounds, summarize(rounds))
 
 
-def evaluate_all_steps(name: str, episodes: int, force: bool) -> None:
-    """Evaluate the snapshots of a run in parallel, then list them by step.
+def evaluate_all_steps(names: list[str], episodes: int, force: bool) -> None:
+    """Evaluate the snapshots of the runs in parallel, all in one pool.
 
     Args:
-        name: Run name.
+        names: Run names.
         episodes: Number of rounds per snapshot.
         force: Evaluate again the snapshots already evaluated.
     """
-    all_steps = snapshot_steps(name)
-    if not all_steps:
-        sys.exit(f"No snapshots in {model_path(name).parent}")
-    todo = [s for s in all_steps if force or not evaluation_path(name, s).exists()]
+    if empty := [n for n in names if not snapshot_steps(n)]:
+        sys.exit(f"No snapshots in {', '.join(str(RUNS_DIR / n) for n in empty)}")
+    snapshots = [(n, s) for n in names for s in snapshot_steps(n)]
+    todo = [(n, s) for n, s in snapshots if force or not evaluation_path(n, s).exists()]
     jobs = os.cpu_count() or 1
     print(
-        f"{len(todo)} of {len(all_steps)} snapshots to evaluate,"
+        f"{len(todo)} of {len(snapshots)} snapshots to evaluate,"
         + f" {episodes} rounds each, {jobs} at once"
     )
-    summaries = {}
     # spawn, not fork: forking after torch has started its threads can hang.
     context = multiprocessing.get_context("spawn")
     with ProcessPoolExecutor(jobs, mp_context=context) as pool:
         futures = {
-            pool.submit(evaluate_snapshot, name, steps, episodes): steps
-            for steps in todo
+            pool.submit(evaluate_snapshot, n, s, episodes): (n, s) for n, s in todo
         }
         for future in as_completed(futures):
-            steps = futures[future]
-            summaries[steps] = future.result()
-            print(f"done  steps {steps}", flush=True)
-
-    print(f"\n{episodes} rounds each (seeds {FIRST_SEED} down)")
-    for steps in todo:
-        s = summaries[steps]
-        low, high = s["seconds_mean_ci95"]
-        print(
-            f"steps {steps:>9}  mean {s['seconds_mean']:.1f} ({low:.1f}-{high:.1f})"
-            + f"  median {s['seconds_quartiles'][1]:.1f}"
-            + f"  entropy {s['entropy_mean']:.2f}  margin {s['margin_mean']:.2f}"
-        )
-    print(f"\nSaved to {evaluation_path(name, all_steps[0]).parent}")
+            future.result()
+            name, steps = futures[future]
+            print(f"done  {name} steps {steps}", flush=True)
 
 
 def main() -> None:
-    """Evaluate the run's snapshots, or the random policy, and save the results."""
+    """Evaluate the runs' snapshots, or the random policy, and save the results."""
     args = parse_args()
     if not args.random:
-        evaluate_all_steps(args.name, args.episodes, args.force)
+        names = [run_name(args.name, seed) for seed in args.seed]
+        evaluate_all_steps(names, args.episodes, args.force)
         return
 
     rng = np.random.default_rng(0)

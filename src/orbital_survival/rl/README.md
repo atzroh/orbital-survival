@@ -20,8 +20,9 @@ uv run --group rl python -m orbital_survival.rl.train --name foo --seed 0
 # train seeds 0-4 as runs/foo_s0 ... runs/foo_s4, three at a time
 uv run --group rl python -m orbital_survival.rl.train --name foo --seed 0 1 2 3 4 --jobs 3
 
-# evaluate every snapshot of the run over fixed seeded rounds, several at once
-uv run --group rl python -m orbital_survival.rl.evaluate --name foo_s0
+# evaluate every snapshot of runs foo_s0 to foo_s4 over fixed seeded rounds,
+# several at once
+uv run --group rl python -m orbital_survival.rl.evaluate --name foo --seed 0 1 2 3 4
 
 # evaluate a random policy over the same rounds, as a baseline
 uv run --group rl python -m orbital_survival.rl.evaluate --random
@@ -34,7 +35,8 @@ uv run --group rl tensorboard --logdir runs
 ```
 
 `train` saves each seed under `runs/<name>_s<seed>/`, even when only one seed
-is given; the other scripts take that folder name as `--name`.
+is given. `evaluate` takes the same `--name` and `--seed`; `watch` takes that
+folder name as `--name`.
 `watch` loads the run's newest snapshot; add `--steps 500000` to load the one
 saved at that step count instead. Every script prints all of
 its options with `--help`.
@@ -158,11 +160,11 @@ instead of continuing near zero.
 ## Evaluation
 
 `evaluate` plays `--episodes` rounds with every `model_<steps>_steps.zip`
-snapshot of the run, acting greedily, as many snapshots at once as there are
-CPUs, each in its own process with one PyTorch thread. Snapshots evaluated
-before are skipped, so after `--resume` only the new ones are played;
-`--force` plays them all again. It notes each snapshot as it finishes and
-prints a table of them by step at the end. The rounds
+snapshot of the runs `<name>_s<seed>` for each `--seed`, acting greedily. The
+snapshots of all the seeds share one pool, as many at once as there are CPUs,
+each in its own process with one PyTorch thread. Snapshots evaluated before
+are skipped, so after `--resume` only the new ones are played; `--force` plays
+them all again. It notes each snapshot as it finishes. The rounds
 are seeded counting down from `2**31 - 1` (2147483647), far from the small
 seeds given to `train`, so no evaluation round is one the model trained on.
 Each round is cut off at fifteen minutes. `watch --seed N` replays one of those
@@ -180,10 +182,9 @@ It also works out how hesitant the policy is, from the action probabilities at
 each step: their entropy, which reaches ln 3 (1.10) when all three actions are
 equally likely, and the margin between the two most likely actions. These are
 averaged within each round and then over rounds, like the shares. The random
-policy picks uniformly, so it scores ln 3 and 0. The table shows the mean, its
-interval, the median, the entropy and the margin; all the figures, unrounded,
+policy picks uniformly, so it scores ln 3 and 0. All the figures, unrounded,
 go with the result of every round to `evaluation_<steps>_steps.json` in the
-run folder. Evaluating the run again overwrites them.
+run folder; `--force` overwrites them.
 
 `--random` in place of `--name` plays the same rounds with a policy that picks
 each action uniformly at random (its generator seeded with 0, so it repeats),

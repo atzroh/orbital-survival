@@ -34,6 +34,7 @@ from orbital_survival.rl.paths import (
     RUNS_DIR,
     latest_steps,
     model_path,
+    run_name,
 )
 
 
@@ -159,7 +160,7 @@ def run_dir_of(name: str, seed: int) -> Path:
     Returns:
         RUNS_DIR/<name>_s<seed>.
     """
-    return RUNS_DIR / f"{name}_s{seed}"
+    return RUNS_DIR / run_name(name, seed)
 
 
 def start_value(value: float | Callable[[float], float]) -> float:

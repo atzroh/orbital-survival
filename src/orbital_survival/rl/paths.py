@@ -12,6 +12,19 @@ EVALUATION_NAME: Final[str] = "evaluation"  # One JSON per evaluated model file
 RANDOM_RUN: Final[str] = "random"  # Folder for the random policy's evaluation
 
 
+def run_name(name: str, seed: int) -> str:
+    """Name of one seed's run, the folder under RUNS_DIR.
+
+    Args:
+        name: The --name given to train or evaluate.
+        seed: The seed.
+
+    Returns:
+        <name>_s<seed>.
+    """
+    return f"{name}_s{seed}"
+
+
 def model_path(name: str, steps: int | None = None) -> Path:
     """Path of a run's final model, or of one of its snapshots.
 
