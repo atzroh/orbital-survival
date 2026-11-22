@@ -1,8 +1,8 @@
-"""Evaluate a trained model, or a random policy, over fixed seeded rounds.
+"""Evaluate every snapshot of a run, or a random policy, over fixed seeded rounds.
 
-Run with `uv run --group rl python -m orbital_survival.rl.evaluate --name foo`,
-or with `--random` instead of `--name` for the random policy. Add `--all-steps`
-to evaluate every snapshot of the run in parallel.
+Run with `uv run --group rl python -m orbital_survival.rl.evaluate --name foo`
+to evaluate the snapshots in parallel, or with `--random` instead of `--name`
+for the random policy.
 """
 
 import argparse
@@ -29,7 +29,6 @@ from orbital_survival.rl.env import Observation, OrbitalSurvivalEnv
 from orbital_survival.rl.paths import (
     RANDOM_RUN,
     evaluation_path,
-    latest_steps,
     model_path,
     snapshot_steps,
 )
@@ -64,28 +63,14 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description="Evaluate a trained PPO agent.")
     target = parser.add_mutually_exclusive_group(required=True)
-    target.add_argument("--name", help="run to load, the name given to train")
+    target.add_argument("--name", help="run whose snapshots to evaluate")
     target.add_argument(
         "--random",
         action="store_true",
         help=f"play a random policy instead, saving under runs/{RANDOM_RUN}",
     )
-    parser.add_argument(
-        "--steps",
-        type=int,
-        help="load the snapshot saved at this step count instead of the newest",
-    )
-    parser.add_argument(
-        "--all-steps",
-        action="store_true",
-        help="evaluate every snapshot of the run, not just the newest",
-    )
     parser.add_argument("--episodes", type=int, default=100, help="rounds to play")
     args = parser.parse_args()
-    if args.random and args.steps is not None:
-        parser.error("--steps needs --name")
-    if args.all_steps and (args.random or args.steps is not None):
-        parser.error("--all-steps needs --name and no --steps")
     if args.episodes < 2:
         parser.error("--episodes must be at least 2 for the spread statistics")
     return args
@@ -214,7 +199,7 @@ def save(
 
     Args:
         run: Run name, the folder under runs/.
-        steps: Step count of the snapshot, or None for the final model.
+        steps: Step count of the snapshot, or None for the random policy.
         model_file: Name of the evaluated model file, or None for the random policy.
         rounds: The result of each round.
         summary: The statistics from summarize.
@@ -251,6 +236,7 @@ def evaluate_snapshot(name: str, steps: int, episodes: int) -> dict[str, Any]:
     torch.set_num_threads(1)
     path = model_path(name, steps)
     model = PPO.load(path, device="cpu")
+    # Act greedily: no exploration noise, so this measures the real skill.
     rounds = run_episodes(greedy_policy(model), episodes)
     summary = summarize(rounds)
     save(name, steps, path.name, rounds, summary)
@@ -295,30 +281,14 @@ def evaluate_all_steps(name: str, episodes: int) -> None:
 
 
 def main() -> None:
-    """Evaluate the model or the random policy, print a summary and save it."""
+    """Evaluate the run's snapshots, or the random policy, and save the results."""
     args = parse_args()
-    if args.all_steps:
+    if not args.random:
         evaluate_all_steps(args.name, args.episodes)
         return
 
-    if args.random:
-        run, steps, model_file = RANDOM_RUN, None, None
-        rng = np.random.default_rng(0)
-        rounds = run_episodes(
-            lambda _: (np.int64(rng.integers(3)), UNIFORM), args.episodes
-        )
-    else:
-        steps = args.steps if args.steps is not None else latest_steps(args.name)
-        if steps is None:
-            sys.exit(f"No snapshots in {model_path(args.name).parent}")
-        path = model_path(args.name, steps)
-        if not path.exists():
-            sys.exit(f"No model at {path}")
-        run, model_file = args.name, path.name
-        model = PPO.load(path, device="cpu")
-        # Act greedily: no exploration noise, so this measures the real skill.
-        rounds = run_episodes(greedy_policy(model), args.episodes)
-
+    rng = np.random.default_rng(0)
+    rounds = run_episodes(lambda _: (np.int64(rng.integers(3)), UNIFORM), args.episodes)
     summary = summarize(rounds)
 
     last_seed = FIRST_SEED - args.episodes + 1
@@ -343,7 +313,7 @@ def main() -> None:
         + f"  margin {s['margin_mean']:.2f}"
     )
 
-    out = save(run, steps, model_file, rounds, summary)
+    out = save(RANDOM_RUN, None, None, rounds, summary)
     print(f"\nSaved to {out}")
 
 

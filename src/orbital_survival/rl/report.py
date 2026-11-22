@@ -1,7 +1,7 @@
 """List the saved evaluations of a run by step, beside the random baseline.
 
 Run with `uv run python -m orbital_survival.rl.report --name foo` after
-evaluating its snapshots with `evaluate --all-steps`.
+evaluating its snapshots with `evaluate`.
 """
 
 import argparse
@@ -47,12 +47,11 @@ def load_evaluations(name: str) -> dict[str, dict[str, Any]]:
 
     Returns:
         Row label to evaluation record: each snapshot's steps in order, then
-        "final" and "random" when they exist.
+        "random" when it exists.
     """
     paths = {
         str(steps): evaluation_path(name, steps) for steps in evaluated_steps(name)
     }
-    paths["final"] = evaluation_path(name)
     paths["random"] = evaluation_path(RANDOM_RUN)
     return {
         label: json.loads(path.read_text())

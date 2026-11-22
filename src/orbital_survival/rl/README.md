@@ -20,11 +20,8 @@ uv run --group rl python -m orbital_survival.rl.train --name foo --seed 0
 # train seeds 0-4 as runs/foo_s0 ... runs/foo_s4, three at a time
 uv run --group rl python -m orbital_survival.rl.train --name foo --seed 0 1 2 3 4 --jobs 3
 
-# evaluate the model over fixed seeded rounds
+# evaluate every snapshot of the run over fixed seeded rounds, several at once
 uv run --group rl python -m orbital_survival.rl.evaluate --name foo_s0
-
-# evaluate every snapshot of the run, several at once
-uv run --group rl python -m orbital_survival.rl.evaluate --name foo_s0 --all-steps
 
 # evaluate a random policy over the same rounds, as a baseline
 uv run --group rl python -m orbital_survival.rl.evaluate --random
@@ -41,8 +38,8 @@ uv run --group rl tensorboard --logdir runs
 
 `train` saves each seed under `runs/<name>_s<seed>/`, even when only one seed
 is given; the other scripts take that folder name as `--name`.
-`evaluate` and `watch` load the run's newest snapshot; add `--steps 500000` to
-load the one saved at that step count instead. Every script prints all of
+`watch` loads the run's newest snapshot; add `--steps 500000` to load the one
+saved at that step count instead. Every script prints all of
 its options with `--help`.
 
 `watch` always opens the telemetry graph of the game's `--graph` (see the
@@ -164,14 +161,16 @@ instead of continuing near zero.
 
 ## Evaluation
 
-`evaluate` plays `--episodes` rounds with the model, acting greedily, and
-prints its survival time. The rounds
+`evaluate` plays `--episodes` rounds with every `model_<steps>_steps.zip`
+snapshot of the run, acting greedily, as many snapshots at once as there are
+CPUs, each in its own process with one PyTorch thread. It notes each snapshot
+as it finishes and prints a table by step at the end. The rounds
 are seeded counting down from `2**31 - 1` (2147483647), far from the small
 seeds given to `train`, so no evaluation round is one the model trained on.
 Each round is cut off at fifteen minutes. `watch --seed N` replays one of those
 rounds again and again.
 
-Besides the mean, min and max, it prints the median survival time, its
+For each snapshot it works out the mean, min, max and median survival time, its
 standard deviation and quartiles, a 95% confidence interval for the mean, how
 many rounds reached the cut-off, the share of each action and how often the
 action switches. The interval comes from a BCa bootstrap (SciPy, 10,000
@@ -179,30 +178,23 @@ resamples with a fixed seed), which suits the long right tail of survival
 times better than a t interval. The shares are taken within each round and then averaged, so a long
 round counts no more than a short one.
 
-It also prints how hesitant the policy is, from the action probabilities at
+It also works out how hesitant the policy is, from the action probabilities at
 each step: their entropy, which reaches ln 3 (1.10) when all three actions are
 equally likely, and the margin between the two most likely actions. These are
 averaged within each round and then over rounds, like the shares. The random
-policy picks uniformly, so it scores ln 3 and 0. It also writes these figures, unrounded,
-with the result of every round to `evaluation_<steps>_steps.json` in the run
-folder; evaluating the same snapshot again overwrites it.
+policy picks uniformly, so it scores ln 3 and 0. The table shows the mean, its
+interval, the median, the entropy and the margin; all the figures, unrounded,
+go with the result of every round to `evaluation_<steps>_steps.json` in the
+run folder. Evaluating the run again overwrites them.
 
 `--random` in place of `--name` plays the same rounds with a policy that picks
 each action uniformly at random (its generator seeded with 0, so it repeats),
-and saves to `runs/random/evaluation.json` with `model_file` set to null. Use it
-as the baseline a trained model should beat.
-
-`--all-steps` evaluates every `model_<steps>_steps.zip` snapshot of the run
-instead of the newest one, as many at once as there are CPUs, each in its
-own process with one PyTorch thread. It notes each snapshot as it finishes,
-prints a table by step
-at the end, and saves each to `evaluation_<steps>_steps.json` as if it
-had been evaluated alone with `--steps`.
+prints every figure, and saves to `runs/random/evaluation.json` with
+`model_file` set to null. Use it as the baseline a trained model should beat.
 
 `report` reads those files back without evaluating anything, so it needs no
-`rl` group. It prints one line per snapshot in step order, then the final
-model of runs older than snapshot-only training and `runs/random` when they
-have been evaluated, and writes the same rows
+`rl` group. It prints one line per snapshot in step order, then
+`runs/random` when it has been evaluated, and writes the same rows
 with every summary figure to `report.csv` in the run folder. It warns when
 the rows were not played over the same rounds (`episodes`, `first_seed`,
 `max_seconds`). It does not join `progress.csv`; read that separately when
