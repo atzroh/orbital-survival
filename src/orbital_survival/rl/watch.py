@@ -11,7 +11,7 @@ from stable_baselines3 import PPO
 
 from orbital_survival.config import FPS
 from orbital_survival.rl.env import OrbitalSurvivalEnv
-from orbital_survival.rl.paths import model_path
+from orbital_survival.rl.paths import latest_steps, model_path
 
 
 def parse_args() -> argparse.Namespace:
@@ -27,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--steps",
         type=int,
-        help="load the snapshot saved at this step count instead of the final model",
+        help="load the snapshot saved at this step count instead of the newest",
     )
     parser.add_argument(
         "--seed",
@@ -41,7 +41,10 @@ def main() -> None:
     """Play rounds until the window is closed, printing each result."""
     args = parse_args()
 
-    path = model_path(args.name, args.steps)
+    steps = args.steps if args.steps is not None else latest_steps(args.name)
+    if steps is None:
+        sys.exit(f"No snapshots in {model_path(args.name).parent}")
+    path = model_path(args.name, steps)
     if not path.exists():
         sys.exit(f"No model at {path}")
     model = PPO.load(path, device="cpu")

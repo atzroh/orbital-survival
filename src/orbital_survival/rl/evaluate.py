@@ -29,6 +29,7 @@ from orbital_survival.rl.env import Observation, OrbitalSurvivalEnv
 from orbital_survival.rl.paths import (
     RANDOM_RUN,
     evaluation_path,
+    latest_steps,
     model_path,
     snapshot_steps,
 )
@@ -72,12 +73,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--steps",
         type=int,
-        help="load the snapshot saved at this step count instead of the final model",
+        help="load the snapshot saved at this step count instead of the newest",
     )
     parser.add_argument(
         "--all-steps",
         action="store_true",
-        help="evaluate every snapshot of the run, not the final model",
+        help="evaluate every snapshot of the run, not just the newest",
     )
     parser.add_argument("--episodes", type=int, default=100, help="rounds to play")
     args = parser.parse_args()
@@ -301,13 +302,16 @@ def main() -> None:
         return
 
     if args.random:
-        run, model_file = RANDOM_RUN, None
+        run, steps, model_file = RANDOM_RUN, None, None
         rng = np.random.default_rng(0)
         rounds = run_episodes(
             lambda _: (np.int64(rng.integers(3)), UNIFORM), args.episodes
         )
     else:
-        path = model_path(args.name, args.steps)
+        steps = args.steps if args.steps is not None else latest_steps(args.name)
+        if steps is None:
+            sys.exit(f"No snapshots in {model_path(args.name).parent}")
+        path = model_path(args.name, steps)
         if not path.exists():
             sys.exit(f"No model at {path}")
         run, model_file = args.name, path.name
@@ -339,7 +343,7 @@ def main() -> None:
         + f"  margin {s['margin_mean']:.2f}"
     )
 
-    out = save(run, args.steps, model_file, rounds, summary)
+    out = save(run, steps, model_file, rounds, summary)
     print(f"\nSaved to {out}")
 
 

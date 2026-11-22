@@ -55,6 +55,18 @@ def snapshot_steps(name: str) -> list[int]:
     return sorted(int(f.name.removeprefix(prefix).removesuffix(suffix)) for f in files)
 
 
+def latest_steps(name: str) -> int | None:
+    """Step count of a run's newest snapshot.
+
+    Args:
+        name: Run name, the folder under RUNS_DIR.
+
+    Returns:
+        The largest step count, or None when the run has no snapshots.
+    """
+    return max(snapshot_steps(name), default=None)
+
+
 def evaluated_steps(name: str) -> list[int]:
     """Step counts of the snapshots a run has evaluations for, in order.
 

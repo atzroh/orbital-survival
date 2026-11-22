@@ -7,7 +7,6 @@ give several seeds, as in `--seed 0 1 2`, to train them in parallel.
 import argparse
 import json
 import multiprocessing
-import signal
 import sys
 from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor, wait
@@ -16,7 +15,7 @@ from typing import Any
 
 import torch
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback
+from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.logger import (
@@ -29,10 +28,11 @@ from stable_baselines3.common.logger import (
 from orbital_survival.rl.env import OrbitalSurvivalEnv
 from orbital_survival.rl.paths import (
     CONFIG_FILE,
-    MODEL_FILE,
     MODEL_NAME,
     PROGRESS_FILE,
     RUNS_DIR,
+    latest_steps,
+    model_path,
 )
 
 
@@ -51,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--resume",
         action="store_true",
-        help="continue each seed's saved model in the same folder; "
+        help="continue each seed's newest snapshot in the same folder; "
         "not recommended for --linear-lr models",
     )
     parser.add_argument(
@@ -249,55 +249,15 @@ def appending_csv(path: Path) -> CSVOutputFormat:
     return csv
 
 
-_interrupted = False  # Set by Ctrl+C in a worker process
-
-
-def catch_interrupt() -> None:
-    """Make Ctrl+C stop training gently in this worker process.
-
-    A KeyboardInterrupt in an idle worker would break the whole pool, so only
-    set a flag, which StopOnInterrupt reads at the next step.
-    """
-
-    def handle(signum: int, frame: object) -> None:
-        """Note the interrupt.
-
-        Args:
-            signum: The signal number.
-            frame: The interrupted stack frame.
-        """
-        global _interrupted
-        _interrupted = True
-
-    signal.signal(signal.SIGINT, handle)
-
-
-class StopOnInterrupt(BaseCallback):
-    """Stop training at the next step after Ctrl+C."""
-
-    def _on_step(self) -> bool:
-        """Check for Ctrl+C.
-
-        Returns:
-            False to stop training.
-        """
-        return not _interrupted
-
-
-def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> str:
-    """Train and save one seed's model; run in a worker process.
+def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> None:
+    """Train one seed, saving only snapshots; run in a worker process.
 
     Args:
         args: The parsed arguments.
         seed: The seed to train.
         quiet: Leave out the console table, as other seeds train at once.
-
-    Returns:
-        "saved", "interrupted", or "skipped" when Ctrl+C came before it started.
     """
     tag = f"[s{seed}] "
-    if _interrupted:
-        return "skipped"
     run_dir = run_dir_of(args.name, seed)
     torch.set_num_threads(args.torch_threads)
     env = make_vec_env(OrbitalSurvivalEnv, n_envs=args.num_envs)
@@ -317,7 +277,10 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> str:
     learning_rate = linear_lr if args.linear_lr else initial_lr
     # A small MLP trains faster on the CPU than on a GPU.
     if args.resume:
-        model = PPO.load(run_dir / MODEL_FILE, env=env, device="cpu", seed=seed)
+        steps = latest_steps(run_dir.name)
+        assert steps is not None  # main checked it
+        path = model_path(run_dir.name, steps)
+        model = PPO.load(path, env=env, device="cpu", seed=seed)
     else:
         model = PPO(
             "MlpPolicy",
@@ -358,25 +321,21 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> str:
     # Without a reset the step count, and so checkpoint names, carry on.
     model.learn(
         total_timesteps=args.timesteps,
-        callback=[checkpoint, StopOnInterrupt()],
+        callback=checkpoint,
         reset_num_timesteps=not args.resume,
     )
-    # Keep what was learned even when interrupted, so --resume can carry on.
-    if _interrupted:
-        print(f"{tag}Interrupted", flush=True)
-    model.save(run_dir / MODEL_NAME)
-    print(f"{tag}Saved model to {run_dir / MODEL_FILE}", flush=True)
-    return "interrupted" if _interrupted else "saved"
+    # Only the snapshots are kept: the rest of PPO's last rollout is dropped.
+    print(f"{tag}Stopped at {model.num_timesteps} steps", flush=True)
 
 
 def main() -> None:
-    """Check the environment, train PPO for each seed in parallel, and save."""
+    """Check the environment and train PPO for each seed in parallel."""
     args = parse_args()
     # Check every seed first, so a bad one does not stop the others midway.
     for seed in args.seed:
         run_dir = run_dir_of(args.name, seed)
-        if args.resume and not (run_dir / MODEL_FILE).exists():
-            sys.exit(f"No model to resume at {run_dir / MODEL_FILE}")
+        if args.resume and latest_steps(run_dir.name) is None:
+            sys.exit(f"No snapshot to resume in {run_dir}")
         if not args.resume and run_dir.exists():
             sys.exit(f"{run_dir} already exists; add --resume or pick another --name")
 
@@ -387,38 +346,19 @@ def main() -> None:
     print(f"{len(args.seed)} seeds, {jobs} at once", flush=True)
     # spawn, not fork: forking after torch has started its threads can hang.
     context = multiprocessing.get_context("spawn")
-    futures: dict[int, Future[str]] = {}
-
-    def stop(signum: int, frame: object) -> None:
-        """Skip the seeds not started yet; the running ones save on their own.
-
-        uv passes Ctrl+C on as well, so this may run twice.
-
-        Args:
-            signum: The signal number.
-            frame: The interrupted stack frame.
-        """
-        if skipped := [seed for seed, f in futures.items() if f.cancel()]:
-            print(f"Interrupted; skipping seeds {skipped}", flush=True)
-
-    signal.signal(signal.SIGINT, stop)
-    with ProcessPoolExecutor(
-        jobs, mp_context=context, initializer=catch_interrupt
-    ) as pool:
-        for seed in args.seed:
-            futures[seed] = pool.submit(train_seed, args, seed, quiet)
+    with ProcessPoolExecutor(jobs, mp_context=context) as pool:
+        futures: dict[int, Future[None]] = {
+            seed: pool.submit(train_seed, args, seed, quiet) for seed in args.seed
+        }
         wait(futures.values())
 
     print()
     failed = []
     for seed, future in futures.items():
-        if future.cancelled():
-            status = "skipped"
-        elif (error := future.exception()) is not None:
+        status = "done"
+        if (error := future.exception()) is not None:
             status = f"failed: {error!r}"
             failed.append(seed)
-        else:
-            status = future.result()
         print(f"seed {seed}: {status}  {run_dir_of(args.name, seed)}")
     if failed:
         sys.exit(f"Failed seeds: {' '.join(map(str, failed))}")

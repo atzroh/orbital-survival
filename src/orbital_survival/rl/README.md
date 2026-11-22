@@ -41,8 +41,8 @@ uv run --group rl tensorboard --logdir runs
 
 `train` saves each seed under `runs/<name>_s<seed>/`, even when only one seed
 is given; the other scripts take that folder name as `--name`.
-`evaluate` and `watch` load `runs/<name>/model.zip`; add `--steps 500000` to
-load the snapshot saved at that step count instead. Every script prints all of
+`evaluate` and `watch` load the run's newest snapshot; add `--steps 500000` to
+load the one saved at that step count instead. Every script prints all of
 its options with `--help`.
 
 `watch` always opens the telemetry graph of the game's `--graph` (see the
@@ -57,12 +57,11 @@ Each run keeps everything under `runs/<name>/` (ignored by git), where
 
 ```text
 runs/foo_s0
-├── model.zip                # final model
 ├── model_100000_steps.zip   # snapshot every --checkpoint-every steps
 ├── config.json              # training conditions of each train invocation
 ├── progress.csv             # training log, one row per PPO update
 ├── events.out.tfevents.*    # the same log for TensorBoard
-├── evaluation.json          # evaluate results (evaluation_<steps>_steps.json for a snapshot)
+├── evaluation_<steps>_steps.json  # evaluate results of each snapshot
 └── report.csv               # every evaluation of the run by step, written by report
 ```
 
@@ -122,14 +121,14 @@ for the seconds survived per round.
 `--seed 0 1 2` trains each seed in its own process, `--jobs` of them at once
 (5 by default, where the total speed levels off on a 4-core CPU); the rest
 start as others finish. With two or more
-seeds the console shows one line per run start, snapshot and save instead of
+seeds the console shows one line per run start, snapshot and stop instead of
 the table, which would interleave; `progress.csv` and TensorBoard are written
 as with one seed. Each process gets `--torch-threads` PyTorch threads. A seed
 that fails does not stop the others, and `train` lists every seed's outcome at
 the end, exiting with an error if one failed.
 
-Ctrl+C stops every running seed at its next step and saves its `model.zip`, so
-`--resume` can carry on; seeds not started yet are skipped.
+Ctrl+C stops every seed at once without saving, so `--resume` carries on from
+each one's newest snapshot.
 
 ### Reproducibility
 
@@ -141,12 +140,18 @@ or more the run is still repeatable.
 
 ### Resuming
 
-`--name foo --seed 0 --resume` continues `runs/foo_s0/model.zip` in the same folder,
-keeping its weights, optimizer state, step count and hyperparameters;
-`--timesteps` is added on top. Snapshot names carry on the step count, and the
-logs carry on too: `progress.csv` gets the new rows under the same header, and
-TensorBoard draws one continuous curve. Runs resume only from `model.zip`, not
-from a snapshot.
+`--name foo --seed 0 --resume` continues the newest snapshot of `runs/foo_s0/`
+in the same folder, keeping its weights, optimizer state, step count and
+hyperparameters; `--timesteps` is added on top. Snapshot names carry on the
+step count, and the logs carry on too: `progress.csv` gets the new rows under
+the same header, and TensorBoard draws one continuous curve.
+
+`train` keeps only the snapshots, no final model. PPO trains in whole
+rollouts, so a 5M-step run ends at 5,001,216 steps; the steps past the last
+snapshot are dropped and a resumed run starts again from 5,000,000. Snapshot
+names then stay on the `--checkpoint-every` grid, the same as a run trained
+in one go. Keep `--timesteps` a multiple of `--checkpoint-every`, or the steps
+past the last snapshot are lost.
 
 Models trained with `--linear-lr` are not meant to be resumed. The saved
 schedule is recomputed against the new total, so resuming a finished 1M-step
@@ -175,8 +180,8 @@ each step: their entropy, which reaches ln 3 (1.10) when all three actions are
 equally likely, and the margin between the two most likely actions. These are
 averaged within each round and then over rounds, like the shares. The random
 policy picks uniformly, so it scores ln 3 and 0. It also writes these figures, unrounded,
-with the result of every round to `evaluation.json` in the run folder, or to `evaluation_<steps>_steps.json`
-for a snapshot; evaluating the same model again overwrites it.
+with the result of every round to `evaluation_<steps>_steps.json` in the run
+folder; evaluating the same snapshot again overwrites it.
 
 `--random` in place of `--name` plays the same rounds with a policy that picks
 each action uniformly at random (its generator seeded with 0, so it repeats),
@@ -184,7 +189,7 @@ and saves to `runs/random/evaluation.json` with `model_file` set to null. Use it
 as the baseline a trained model should beat.
 
 `--all-steps` evaluates every `model_<steps>_steps.zip` snapshot of the run
-instead of the final model, as many at once as there are CPUs, each in its
+instead of the newest one, as many at once as there are CPUs, each in its
 own process with one PyTorch thread. It notes each snapshot as it finishes,
 prints a table by step
 at the end, and saves each to `evaluation_<steps>_steps.json` as if it
@@ -192,7 +197,8 @@ had been evaluated alone with `--steps`.
 
 `report` reads those files back without evaluating anything, so it needs no
 `rl` group. It prints one line per snapshot in step order, then the final
-model and `runs/random` when they have been evaluated, and writes the same rows
+model of runs older than snapshot-only training and `runs/random` when they
+have been evaluated, and writes the same rows
 with every summary figure to `report.csv` in the run folder. It warns when
 the rows were not played over the same rounds (`episodes`, `first_seed`,
 `max_seconds`). It does not join `progress.csv`; read that separately when
