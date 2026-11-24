@@ -13,6 +13,7 @@ from orbital_survival.config import (
     BLACK,
     FPS,
     MAX_LIVES,
+    NUM_BACKGROUND_STARS,
     PLANET_ORBIT_RADIUS,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
@@ -23,6 +24,7 @@ from orbital_survival.entities.star import CANNON_COUNT
 from orbital_survival.logic import Logic
 from orbital_survival.ui.graph import GraphRecorder, GraphWindow
 from orbital_survival.ui.hud import HUD, HUDState
+from orbital_survival.ui.starfield import BackgroundStar, create_stars, draw_stars
 
 type Observation = npt.NDArray[np.float32]
 
@@ -79,6 +81,7 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
         self.screen: pygame.Surface | None = None
         self.clock: pygame.time.Clock | None = None
         self.hud: HUD | None = None
+        self.background_stars: list[BackgroundStar] = []
         # Telemetry graph beside the game; None until drawn or once closed.
         self.graph: GraphWindow | None = None
         self.recorder = GraphRecorder()
@@ -159,6 +162,7 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
             pygame.display.set_caption("ORBITAL SURVIVAL (AI)")
             self.clock = pygame.time.Clock()
             self.hud = HUD()
+            self.background_stars = create_stars(NUM_BACKGROUND_STARS)
             self.graph = GraphWindow()
             self.graph.place_beside_game()
             self.graph.attach(self.recorder)
@@ -178,6 +182,7 @@ class OrbitalSurvivalEnv(gym.Env[Observation, np.int64]):
                 self.quit_requested = True
 
         self.screen.fill(BLACK)
+        draw_stars(self.screen, self.background_stars)
         for corpse in self.logic.corpses:
             corpse.draw(self.screen)
         self.logic.star.draw(self.screen)
