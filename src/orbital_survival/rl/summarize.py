@@ -1,6 +1,6 @@
 """Average the evaluations of every run over its seeds, by condition and step.
 
-A condition is a run name without its _s<seed>, the --name given to train.
+A condition is the folder holding the s<seed> runs, the --name given to train.
 Run with `uv run python -m orbital_survival.rl.summarize` after `evaluate`.
 """
 
@@ -20,7 +20,7 @@ from orbital_survival.rl.paths import (
     evaluation_path,
 )
 
-RUN_NAME = re.compile(r"(?P<condition>.+)_s\d+")
+SEED_DIR = re.compile(r"s\d+")
 COLUMNS = [
     "condition",
     "n_seeds",
@@ -43,12 +43,14 @@ def load_summaries() -> dict[tuple[str, int], list[Summary]]:
         (condition, step count) to the summaries of its seeds.
     """
     groups: dict[tuple[str, int], list[Summary]] = defaultdict(list)
-    for run_dir in RUNS_DIR.iterdir():
-        if not run_dir.is_dir() or not (m := RUN_NAME.fullmatch(run_dir.name)):
+    for run_dir in RUNS_DIR.glob("*/s*"):
+        if not run_dir.is_dir() or not SEED_DIR.fullmatch(run_dir.name):
             continue
-        for steps in evaluated_steps(run_dir.name):
-            record = json.loads(evaluation_path(run_dir.name, steps).read_text())
-            groups[m["condition"], steps].append(record["summary"])
+        condition = run_dir.parent.name
+        run = f"{condition}/{run_dir.name}"
+        for steps in evaluated_steps(run):
+            record = json.loads(evaluation_path(run, steps).read_text())
+            groups[condition, steps].append(record["summary"])
     return groups
 
 

@@ -1,4 +1,4 @@
-"""Train PPO agents on OrbitalSurvivalEnv and save each under runs/<name>_s<seed>/.
+"""Train PPO agents on OrbitalSurvivalEnv and save each under runs/<name>/s<seed>/.
 
 Run with `uv run --group rl python -m orbital_survival.rl.train --name foo --seed 0`;
 give several seeds, as in `--seed 0 1 2`, to train them in parallel.
@@ -48,7 +48,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--name",
         required=True,
-        help=f"run name; each seed is saved under {RUNS_DIR}/<name>_s<seed>/",
+        help=f"run name; each seed is saved under {RUNS_DIR}/<name>/s<seed>/",
     )
     parser.add_argument(
         "--resume",
@@ -158,7 +158,7 @@ def run_dir_of(name: str, seed: int) -> Path:
         seed: The seed.
 
     Returns:
-        RUNS_DIR/<name>_s<seed>.
+        RUNS_DIR/<name>/s<seed>.
     """
     return RUNS_DIR / run_name(name, seed)
 
@@ -265,7 +265,7 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> None:
     """
     tag = f"[s{seed}] "
     run_dir = run_dir_of(args.name, seed)
-    start = (latest_steps(run_dir.name) or 0) if args.resume else 0
+    start = (latest_steps(run_name(args.name, seed)) or 0) if args.resume else 0
     if start >= args.timesteps:
         print(f"{tag}Already at {start} steps", flush=True)
         return
@@ -287,7 +287,7 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> None:
     learning_rate = linear_lr if args.linear_lr else initial_lr
     # A small MLP trains faster on the CPU than on a GPU.
     if args.resume:
-        path = model_path(run_dir.name, start)
+        path = model_path(run_name(args.name, seed), start)
         model = PPO.load(path, env=env, device="cpu", seed=seed)
     else:
         model = PPO(
@@ -342,7 +342,7 @@ def main() -> None:
     # Check every seed first, so a bad one does not stop the others midway.
     for seed in args.seed:
         run_dir = run_dir_of(args.name, seed)
-        if args.resume and latest_steps(run_dir.name) is None:
+        if args.resume and latest_steps(run_name(args.name, seed)) is None:
             sys.exit(f"No snapshot to resume in {run_dir}")
         if not args.resume and run_dir.exists():
             sys.exit(f"{run_dir} already exists; add --resume or pick another --name")

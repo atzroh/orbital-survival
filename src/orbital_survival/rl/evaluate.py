@@ -1,7 +1,7 @@
 """Evaluate every snapshot of a run, or a random policy, over fixed seeded rounds.
 
 Run with `uv run --group rl python -m orbital_survival.rl.evaluate --name foo
---seed 0 1 2` to evaluate the snapshots of runs foo_s0 to foo_s2 in parallel,
+--seed 0 1 2` to evaluate the snapshots of runs foo/s0 to foo/s2 in parallel,
 or with `--random` instead of `--name` for the random policy.
 """
 
@@ -75,7 +75,7 @@ def parse_args() -> argparse.Namespace:
         "--seed",
         type=int,
         nargs="+",
-        help="seeds of the runs to evaluate, <name>_s<seed> each",
+        help="seeds of the runs to evaluate, <name>/s<seed> each",
     )
     parser.add_argument("--episodes", type=int, default=100, help="rounds to play")
     parser.add_argument(

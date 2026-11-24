@@ -1,4 +1,4 @@
-"""Where training runs keep their files: one folder per run under runs/."""
+"""Where training runs keep their files: runs/<name>/s<seed>/ for each run."""
 
 from pathlib import Path
 from typing import Final
@@ -13,23 +13,23 @@ SUMMARY_FILE: Final[str] = "summary.csv"  # Every condition by step, under RUNS_
 
 
 def run_name(name: str, seed: int) -> str:
-    """Name of one seed's run, the folder under RUNS_DIR.
+    """Name of one seed's run, its folder relative to RUNS_DIR.
 
     Args:
         name: The --name given to train or evaluate.
         seed: The seed.
 
     Returns:
-        <name>_s<seed>.
+        <name>/s<seed>.
     """
-    return f"{name}_s{seed}"
+    return f"{name}/s{seed}"
 
 
 def model_path(name: str, steps: int) -> Path:
     """Path of one of a run's snapshots.
 
     Args:
-        name: Run name, the folder under RUNS_DIR.
+        name: Run name, from run_name.
         steps: Step count of the snapshot.
 
     Returns:
@@ -42,7 +42,7 @@ def evaluation_path(name: str, steps: int | None = None) -> Path:
     """Path of the evaluation results of a snapshot, or of the random policy.
 
     Args:
-        name: Run name, the folder under RUNS_DIR.
+        name: Run name, from run_name.
         steps: Step count of the snapshot, or None for the random policy.
 
     Returns:
@@ -56,7 +56,7 @@ def snapshot_steps(name: str) -> list[int]:
     """Step counts of the snapshots a run saved, in order.
 
     Args:
-        name: Run name, the folder under RUNS_DIR.
+        name: Run name, from run_name.
 
     Returns:
         The step counts, from the model_<steps>_steps.zip files.
@@ -70,7 +70,7 @@ def latest_steps(name: str) -> int | None:
     """Step count of a run's newest snapshot.
 
     Args:
-        name: Run name, the folder under RUNS_DIR.
+        name: Run name, from run_name.
 
     Returns:
         The largest step count, or None when the run has no snapshots.
@@ -82,7 +82,7 @@ def evaluated_steps(name: str) -> list[int]:
     """Step counts of the snapshots a run has evaluations for, in order.
 
     Args:
-        name: Run name, the folder under RUNS_DIR.
+        name: Run name, from run_name.
 
     Returns:
         The step counts, from the evaluation_<steps>_steps.json files.

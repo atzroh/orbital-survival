@@ -14,13 +14,13 @@ uv sync --group rl
 ## Run
 
 ```bash
-# train a run named foo with seed 0, saved under runs/foo_s0 (--name and --seed are required)
+# train a run named foo with seed 0, saved under runs/foo/s0 (--name and --seed are required)
 uv run --group rl python -m orbital_survival.rl.train --name foo --seed 0
 
-# train seeds 0-4 as runs/foo_s0 ... runs/foo_s4, three at a time
+# train seeds 0-4 as runs/foo/s0 ... runs/foo/s4, three at a time
 uv run --group rl python -m orbital_survival.rl.train --name foo --seed 0 1 2 3 4 --jobs 3
 
-# evaluate every snapshot of runs foo_s0 to foo_s4 over fixed seeded rounds,
+# evaluate every snapshot of runs foo/s0 to foo/s4 over fixed seeded rounds,
 # several at once
 uv run --group rl python -m orbital_survival.rl.evaluate --name foo --seed 0 1 2 3 4
 
@@ -31,15 +31,15 @@ uv run --group rl python -m orbital_survival.rl.evaluate --random
 uv run python -m orbital_survival.rl.summarize
 
 # watch the model play in the game window, with the telemetry graph beside it
-uv run --group rl python -m orbital_survival.rl.watch --name foo_s0
+uv run --group rl python -m orbital_survival.rl.watch --name foo --seed 0
 
 # plot the training curves of every run in the browser
 uv run --group rl tensorboard --logdir runs
 ```
 
-`train` saves each seed under `runs/<name>_s<seed>/`, even when only one seed
-is given. `evaluate` takes the same `--name` and `--seed`; `watch` takes that
-folder name as `--name`.
+`train` saves each seed under `runs/<name>/s<seed>/`, even when only one seed
+is given. `evaluate` takes the same `--name` and `--seed`; `watch` takes the
+same `--name` and one `--seed`.
 `watch` loads the run's newest snapshot; add `--steps 500000` to load the one
 saved at that step count instead. Every script prints all of
 its options with `--help`.
@@ -51,11 +51,11 @@ evaluation are unaffected.
 
 ## Run Folder
 
-Each run keeps everything under `runs/<name>/` (ignored by git), where
-`train` names it `<name>_s<seed>`:
+Each run keeps everything under `runs/<name>/s<seed>/` (ignored by git), one
+folder per seed under the folder of its `--name`:
 
 ```text
-runs/foo_s0
+runs/foo/s0
 ├── model_100000_steps.zip   # snapshot every --checkpoint-every steps
 ├── config.json              # training conditions of each train invocation
 ├── progress.csv             # training log, one row per PPO update
@@ -139,7 +139,7 @@ or more the run is still repeatable.
 
 ### Resuming
 
-`--name foo --seed 0 --resume` continues the newest snapshot of `runs/foo_s0/`
+`--name foo --seed 0 --resume` continues the newest snapshot of `runs/foo/s0/`
 in the same folder, keeping its weights, optimizer state, step count and
 hyperparameters. `--timesteps` is the step count the run ends at, not the
 steps to add: a run with snapshots up to 5M, resumed with `--timesteps
@@ -163,14 +163,14 @@ instead of continuing near zero.
 ## Evaluation
 
 `evaluate` plays `--episodes` rounds with every `model_<steps>_steps.zip`
-snapshot of the runs `<name>_s<seed>` for each `--seed`, acting greedily. The
+snapshot of the runs `<name>/s<seed>` for each `--seed`, acting greedily. The
 snapshots of all the seeds share one pool, as many at once as there are CPUs,
 each in its own process with one PyTorch thread. Snapshots evaluated before
 are skipped, so after `--resume` only the new ones are played; `--force` plays
 them all again. It notes each snapshot as it finishes. The rounds
 are seeded counting down from `2**31 - 1` (2147483647), far from the small
 seeds given to `train`, so no evaluation round is one the model trained on.
-Each round is cut off at fifteen minutes. `watch --seed N` replays one of those
+Each round is cut off at fifteen minutes. `watch --round N` replays one of those
 rounds again and again.
 
 For each snapshot it works out the mean, min, max and median survival time, its
@@ -198,7 +198,7 @@ prints every figure, and saves to `runs/random/evaluation.json` with
 
 `summarize` reads every `evaluation_<steps>_steps.json` under `runs/` without
 evaluating anything, so it needs no `rl` group. It groups the runs by
-condition, the run name without its `_s<seed>`, and writes one row per
+condition, the folder holding the `s<seed>` runs, and writes one row per
 condition and step to `runs/summary.csv`: the number of seeds evaluated at
 that step, the mean, standard deviation (empty with one seed), min and max of
 their `seconds_mean`, and the mean of their median survival time and of
