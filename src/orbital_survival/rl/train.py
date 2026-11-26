@@ -29,10 +29,10 @@ from stable_baselines3.common.logger import (
 from orbital_survival.rl.env import OrbitalSurvivalEnv
 from orbital_survival.rl.paths import (
     CONFIG_FILE,
+    MODEL_FILE,
     MODEL_NAME,
     PROGRESS_FILE,
     RUNS_DIR,
-    latest_steps,
     model_path,
     run_name,
 )
@@ -53,7 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--resume",
         action="store_true",
-        help="continue each seed's newest snapshot in the same folder; "
+        help="continue each seed's model.zip in the same folder; "
         "not recommended for --linear-lr models",
     )
     parser.add_argument(
@@ -255,20 +255,19 @@ def appending_csv(path: Path) -> CSVOutputFormat:
     return csv
 
 
-def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> None:
-    """Train one seed, saving only snapshots; run in a worker process.
+def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> str:
+    """Train and save one seed's model; run in a worker process.
 
     Args:
         args: The parsed arguments.
         seed: The seed to train.
         quiet: Leave out the console table, as other seeds train at once.
+
+    Returns:
+        "saved", or "already" when the run is at --timesteps.
     """
     tag = f"[s{seed}] "
     run_dir = run_dir_of(args.name, seed)
-    start = (latest_steps(run_name(args.name, seed)) or 0) if args.resume else 0
-    if start >= args.timesteps:
-        print(f"{tag}Already at {start} steps", flush=True)
-        return
     torch.set_num_threads(args.torch_threads)
     env = make_vec_env(OrbitalSurvivalEnv, n_envs=args.num_envs)
     initial_lr: float = args.learning_rate
@@ -287,9 +286,14 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> None:
     learning_rate = linear_lr if args.linear_lr else initial_lr
     # A small MLP trains faster on the CPU than on a GPU.
     if args.resume:
-        path = model_path(run_name(args.name, seed), start)
+        path = model_path(run_name(args.name, seed))
         model = PPO.load(path, env=env, device="cpu", seed=seed)
+        start = model.num_timesteps
+        if start >= args.timesteps:
+            print(f"{tag}Already at {start} steps", flush=True)
+            return "already"
     else:
+        start = 0
         model = PPO(
             "MlpPolicy",
             env,
@@ -332,18 +336,19 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> None:
         callback=checkpoint,
         reset_num_timesteps=not args.resume,
     )
-    # Only the snapshots are kept: the rest of PPO's last rollout is dropped.
-    print(f"{tag}Stopped at {model.num_timesteps} steps", flush=True)
+    model.save(run_dir / MODEL_NAME)
+    print(f"{tag}Saved model to {run_dir / MODEL_FILE}", flush=True)
+    return "saved"
 
 
 def main() -> None:
-    """Check the environment and train PPO for each seed in parallel."""
+    """Check the environment, train PPO for each seed in parallel, and save."""
     args = parse_args()
     # Check every seed first, so a bad one does not stop the others midway.
     for seed in args.seed:
         run_dir = run_dir_of(args.name, seed)
-        if args.resume and latest_steps(run_name(args.name, seed)) is None:
-            sys.exit(f"No snapshot to resume in {run_dir}")
+        if args.resume and not (run_dir / MODEL_FILE).exists():
+            sys.exit(f"No model to resume at {run_dir / MODEL_FILE}")
         if not args.resume and run_dir.exists():
             sys.exit(f"{run_dir} already exists; add --resume or pick another --name")
 
@@ -362,7 +367,7 @@ def main() -> None:
         initializer=signal.signal,
         initargs=(signal.SIGINT, signal.SIG_DFL),
     ) as pool:
-        futures: dict[int, Future[None]] = {
+        futures: dict[int, Future[str]] = {
             seed: pool.submit(train_seed, args, seed, quiet) for seed in args.seed
         }
         wait(futures.values())
@@ -370,10 +375,11 @@ def main() -> None:
     print()
     failed = []
     for seed, future in futures.items():
-        status = "done"
         if (error := future.exception()) is not None:
             status = f"failed: {error!r}"
             failed.append(seed)
+        else:
+            status = future.result()
         print(f"seed {seed}: {status}  {run_dir_of(args.name, seed)}")
     if failed:
         sys.exit(f"Failed seeds: {' '.join(map(str, failed))}")

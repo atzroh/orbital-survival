@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Final
 
 RUNS_DIR: Final[Path] = Path("runs")
-MODEL_NAME: Final[str] = "model"  # Snapshots are model_<steps>_steps.zip
+MODEL_NAME: Final[str] = "model"  # model.zip, plus model_<steps>_steps.zip snapshots
+MODEL_FILE: Final[str] = MODEL_NAME + ".zip"
 CONFIG_FILE: Final[str] = "config.json"
 PROGRESS_FILE: Final[str] = "progress.csv"
 EVALUATION_NAME: Final[str] = "evaluation"  # One JSON per evaluated model file
@@ -25,17 +26,18 @@ def run_name(name: str, seed: int) -> str:
     return f"{name}/s{seed}"
 
 
-def model_path(name: str, steps: int) -> Path:
-    """Path of one of a run's snapshots.
+def model_path(name: str, steps: int | None = None) -> Path:
+    """Path of a run's final model, or of one of its snapshots.
 
     Args:
         name: Run name, from run_name.
-        steps: Step count of the snapshot.
+        steps: Step count of the snapshot to pick, or None for model.zip.
 
     Returns:
         The model file to load.
     """
-    return RUNS_DIR / name / f"{MODEL_NAME}_{steps}_steps.zip"
+    file = MODEL_FILE if steps is None else f"{MODEL_NAME}_{steps}_steps.zip"
+    return RUNS_DIR / name / file
 
 
 def evaluation_path(name: str, steps: int | None = None) -> Path:
@@ -64,18 +66,6 @@ def snapshot_steps(name: str) -> list[int]:
     prefix, suffix = f"{MODEL_NAME}_", "_steps.zip"
     files = (RUNS_DIR / name).glob(f"{prefix}*{suffix}")
     return sorted(int(f.name.removeprefix(prefix).removesuffix(suffix)) for f in files)
-
-
-def latest_steps(name: str) -> int | None:
-    """Step count of a run's newest snapshot.
-
-    Args:
-        name: Run name, from run_name.
-
-    Returns:
-        The largest step count, or None when the run has no snapshots.
-    """
-    return max(snapshot_steps(name), default=None)
 
 
 def evaluated_steps(name: str) -> list[int]:

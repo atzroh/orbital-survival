@@ -40,8 +40,8 @@ uv run --group rl tensorboard --logdir runs
 `train` saves each seed under `runs/<name>/s<seed>/`, even when only one seed
 is given. `evaluate` takes the same `--name` and `--seed`; `watch` takes the
 same `--name` and one `--seed`.
-`watch` loads the run's newest snapshot; add `--steps 500000` to load the one
-saved at that step count instead. Every script prints all of
+`watch` loads the run's `model.zip`;
+add `--steps 500000` to load the snapshot saved at that step count instead. Every script prints all of
 its options with `--help`.
 
 `watch` always opens the telemetry graph of the game's `--graph` (see the
@@ -56,6 +56,7 @@ folder per seed under the folder of its `--name`:
 
 ```text
 runs/foo/s0
+├── model.zip                # final model
 ├── model_100000_steps.zip   # snapshot every --checkpoint-every steps
 ├── config.json              # training conditions of each train invocation
 ├── progress.csv             # training log, one row per PPO update
@@ -100,8 +101,9 @@ before the change can no longer be loaded or used.
 
 ## Training
 
-`train` checks the environment, trains PPO on the CPU, and saves a snapshot
-every `--checkpoint-every` steps in the run folder. The network and PPO
+`train` checks the environment, trains PPO on the CPU, saves a snapshot
+every `--checkpoint-every` steps in the run folder, and saves the final model
+to `model.zip` at the end. The network and PPO
 hyperparameters (`--net-arch`, `--learning-rate`, `--gamma`, ...) apply to a
 new model only.
 
@@ -120,14 +122,13 @@ for the seconds survived per round.
 `--seed 0 1 2` trains each seed in its own process, `--jobs` of them at once
 (5 by default, where the total speed levels off on a 4-core CPU); the rest
 start as others finish. With two or more
-seeds the console shows one line per run start, snapshot and stop instead of
+seeds the console shows one line per run start, snapshot and save instead of
 the table, which would interleave; `progress.csv` and TensorBoard are written
 as with one seed. Each process gets `--torch-threads` PyTorch threads. A seed
 that fails does not stop the others, and `train` lists every seed's outcome at
 the end, exiting with an error if one failed.
 
-Ctrl+C stops every seed at once without saving, so `--resume` carries on from
-each one's newest snapshot.
+Ctrl+C stops every seed at once without saving `model.zip`.
 
 ### Reproducibility
 
@@ -139,21 +140,19 @@ or more the run is still repeatable.
 
 ### Resuming
 
-`--name foo --seed 0 --resume` continues the newest snapshot of `runs/foo/s0/`
-in the same folder, keeping its weights, optimizer state, step count and
+`--name foo --seed 0 --resume` continues `runs/foo/s0/model.zip` in the same
+folder, keeping its weights, optimizer state, step count and
 hyperparameters. `--timesteps` is the step count the run ends at, not the
-steps to add: a run with snapshots up to 5M, resumed with `--timesteps
-10000000`, trains 5M more. A seed already there is left alone, so after Ctrl+C
+steps to add: a run saved at 5M, resumed with `--timesteps 10000000`, trains
+5M more. A seed already there is left alone, so after Ctrl+C
 the same command brings every seed to the same step. Snapshot names carry on the
 step count, and the logs carry on too: `progress.csv` gets the new rows under
 the same header, and TensorBoard draws one continuous curve.
 
-`train` keeps only the snapshots, no final model. PPO trains in whole
-rollouts, so a 5M-step run ends at 5,001,216 steps; the steps past the last
-snapshot are dropped and a resumed run starts again from 5,000,000. Snapshot
-names then stay on the `--checkpoint-every` grid, the same as a run trained
-in one go. Keep `--timesteps` a multiple of `--checkpoint-every`, or the steps
-past the last snapshot are lost.
+PPO trains in whole rollouts, so a 5M-step run ends at 5,001,216 steps, and
+`model.zip` keeps them all. A run resumed from it counts snapshots from there,
+so their names leave the `--checkpoint-every` grid (5,101,216, ...), unlike a
+run trained in one go.
 
 Models trained with `--linear-lr` are not meant to be resumed. The saved
 schedule is recomputed against the new total, so resuming a finished 1M-step
