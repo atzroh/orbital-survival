@@ -109,10 +109,18 @@ to `model.zip` at the end. The network and PPO
 hyperparameters (`--net-arch`, `--learning-rate`, `--gamma`, ...) apply to a
 new model only.
 
+Training plays 4 rounds at once (`NUM_ENVS` in `train.py`).
+`--rollout-steps` (2048 by default) is the steps gathered across them between
+updates, split evenly, so each plays 512; it must be a multiple of 4. The
+count is fixed rather than an option: changing it changes the run, and the
+environments, run one after another in the same process, would gain little
+speed from more of them.
+
 Before training starts, `train` appends its conditions to `config.json`: the
 step count it starts from (`from_steps`) and the steps it trains for
 (`timesteps`), its PyTorch threads, and the PPO settings the model
-actually trains with, SB3 defaults included. A resumed run adds an entry of its own, so the first
+actually trains with, SB3 defaults included. There `n_steps` is SB3's, per
+environment, and `rollout_steps` is it times `n_envs`. A resumed run adds an entry of its own, so the first
 entry always shows how the model was created.
 
 The training log goes to the console, and to `progress.csv` and
@@ -137,8 +145,8 @@ Ctrl+C stops every seed at once without saving `model.zip`.
 `--seed` seeds Python's `random`, NumPy, PyTorch and the first round of each
 environment, so the same command repeats the same run. Training seeds in
 parallel gives the same run as training each alone. The star draws from
-Python's global `random`, which all environments share, so with `--num-envs` 2
-or more the run is still repeatable.
+Python's global `random`, which all environments share, and as they run one
+after another the run is still repeatable.
 
 ### Resuming
 
@@ -154,8 +162,8 @@ the same header, and TensorBoard draws one continuous curve.
 PPO trains in whole rollouts, so a 5M-step run ends at 5,001,216 steps, and
 `model.zip` keeps them all. Snapshots are still saved as the step count passes
 each multiple of `--checkpoint-every` (5,100,000, ...), so their names stay on
-that grid as in a run trained in one go. With `--num-envs` that does not divide
-`--checkpoint-every`, a snapshot may hold a few steps more than its name.
+that grid as in a run trained in one go. With a `--checkpoint-every` that is
+not a multiple of 4, a snapshot may hold a few steps more than its name.
 
 Models trained with `--linear-lr` are not meant to be resumed. The saved
 schedule is recomputed against the new total, so resuming a finished 1M-step

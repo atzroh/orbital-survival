@@ -12,7 +12,7 @@ import sys
 from collections.abc import Callable
 from concurrent.futures import Future, ProcessPoolExecutor, wait
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import torch
 from stable_baselines3 import PPO
@@ -36,6 +36,8 @@ from orbital_survival.rl.paths import (
     model_path,
     run_name,
 )
+
+NUM_ENVS: Final[int] = 4  # Rounds played at once
 
 
 def parse_args() -> argparse.Namespace:
@@ -94,16 +96,11 @@ def parse_args() -> argparse.Namespace:
         help="discount factor of a new model; ignored with --resume",
     )
     parser.add_argument(
-        "--n-steps",
+        "--rollout-steps",
         type=int,
         default=2048,
-        help="steps per env between updates of a new model; ignored with --resume",
-    )
-    parser.add_argument(
-        "--num-envs",
-        type=int,
-        default=1,
-        help="rounds played at once to gather experience",
+        help=f"steps gathered across all {NUM_ENVS} envs between updates of a new "
+        f"model, a multiple of {NUM_ENVS}; ignored with --resume",
     )
     parser.add_argument(
         "--seed",
@@ -147,6 +144,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--seed has a duplicate")
     if args.jobs < 1:
         parser.error("--jobs must be at least 1")
+    if not args.resume and args.rollout_steps % NUM_ENVS:
+        parser.error(f"--rollout-steps must be a multiple of {NUM_ENVS}")
     return args
 
 
@@ -192,7 +191,8 @@ def ppo_settings(model: PPO) -> dict[str, Any]:
         "linear_lr": callable(model.learning_rate),
         "gamma": model.gamma,
         "gae_lambda": model.gae_lambda,
-        "n_steps": model.n_steps,
+        "rollout_steps": model.n_steps * model.n_envs,
+        "n_steps": model.n_steps,  # Per env
         "n_envs": model.n_envs,
         "batch_size": model.batch_size,
         "n_epochs": model.n_epochs,
@@ -310,7 +310,7 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> str:
     tag = f"[s{seed}] "
     run_dir = run_dir_of(args.name, seed)
     torch.set_num_threads(args.torch_threads)
-    env = make_vec_env(OrbitalSurvivalEnv, n_envs=args.num_envs)
+    env = make_vec_env(OrbitalSurvivalEnv, n_envs=NUM_ENVS)
     initial_lr: float = args.learning_rate
 
     def linear_lr(progress: float) -> float:
@@ -340,7 +340,7 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> str:
             env,
             learning_rate=learning_rate,
             gamma=args.gamma,
-            n_steps=args.n_steps,
+            n_steps=args.rollout_steps // NUM_ENVS,
             batch_size=args.batch_size,
             n_epochs=args.n_epochs,
             ent_coef=args.ent_coef,
