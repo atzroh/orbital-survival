@@ -59,7 +59,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--timesteps",
         type=int,
-        default=1_000_000,
+        default=10_000_000,
         help="agent steps each run ends at; --resume trains up to it",
     )
     parser.add_argument(
