@@ -66,7 +66,7 @@ def parse_args() -> argparse.Namespace:
         "--checkpoint-every",
         type=int,
         default=100_000,
-        help="also save a snapshot every this many steps, in the run folder",
+        help="also save a snapshot to models/ every this many steps",
     )
     parser.add_argument(
         "--net-arch",
@@ -288,6 +288,7 @@ class GridCheckpoint(BaseCallback):
         steps = self.model.num_timesteps
         if steps >= self.next:
             path = model_path(self.run, self.next)
+            path.parent.mkdir(exist_ok=True)  # SB3 would warn before creating it
             self.model.save(path)
             if self.loud:
                 print(f"Saving model checkpoint to {path}", flush=True)

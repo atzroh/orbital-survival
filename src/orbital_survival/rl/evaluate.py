@@ -215,7 +215,8 @@ def save(
     Args:
         run: Run name, the folder under runs/.
         steps: Step count of the snapshot, or None for the random policy.
-        model_file: Name of the evaluated model file, or None for the random policy.
+        model_file: Evaluated model file relative to the run folder, or None for
+            the random policy.
         rounds: The result of each round.
         summary: The statistics from summarize.
 
@@ -250,7 +251,8 @@ def evaluate_snapshot(name: str, steps: int, episodes: int) -> None:
     model = PPO.load(path, device="cpu")
     # Act greedily: no exploration noise, so this measures the real skill.
     rounds = run_episodes(greedy_policy(model), episodes)
-    save(name, steps, path.name, rounds, summarize(rounds))
+    model_file = path.relative_to(RUNS_DIR / name).as_posix()  # models/<steps>.zip
+    save(name, steps, model_file, rounds, summarize(rounds))
 
 
 def evaluate_all_steps(names: list[str], episodes: int, force: bool) -> None:

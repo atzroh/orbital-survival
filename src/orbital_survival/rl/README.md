@@ -57,11 +57,13 @@ folder per seed under the folder of its `--name`:
 ```text
 runs/foo/s0
 ├── model.zip                # final model
-├── model_100000_steps.zip   # snapshot every --checkpoint-every steps
+├── models
+│  └── <steps>.zip           # snapshot every --checkpoint-every steps
+├── evaluations
+│  └── <steps>.json          # evaluate results of each snapshot
 ├── config.json              # training conditions of each train invocation
 ├── progress.csv             # training log, one row per PPO update
-├── events.out.tfevents.*    # the same log for TensorBoard
-└── evaluation_<steps>_steps.json  # evaluate results of each snapshot
+└── events.out.tfevents.*    # the same log for TensorBoard
 ```
 
 `train` refuses a name that already exists, so a run is never overwritten.
@@ -162,7 +164,7 @@ instead of continuing near zero.
 
 ## Evaluation
 
-`evaluate` plays `--episodes` rounds with every `model_<steps>_steps.zip`
+`evaluate` plays `--episodes` rounds with every `models/<steps>.zip`
 snapshot of the runs `<name>/s<seed>` for each `--seed`, acting greedily. The
 snapshots of all the seeds share one pool, as many at once as there are CPUs,
 each in its own process with one PyTorch thread. Snapshots evaluated before
@@ -186,8 +188,8 @@ each step: their entropy, which reaches ln 3 (1.10) when all three actions are
 equally likely, and the margin between the two most likely actions. These are
 averaged within each round and then over rounds, like the shares. The random
 policy picks uniformly, so it scores ln 3 and 0. All the figures, unrounded,
-go with the result of every round to `evaluation_<steps>_steps.json` in the
-run folder; `--force` overwrites them.
+go with the result of every round to `evaluations/<steps>.json` in the
+run folder, its `model_file` naming the snapshot (`models/<steps>.zip`); `--force` overwrites them.
 
 `--random` in place of `--name` plays the same rounds with a policy that picks
 each action uniformly at random (its generator seeded with 0, so it repeats),
@@ -196,7 +198,7 @@ prints every figure, and saves to `runs/random/evaluation.json` with
 
 ## Summary
 
-`summarize` reads every `evaluation_<steps>_steps.json` under `runs/` without
+`summarize` reads every `evaluations/<steps>.json` under `runs/` without
 evaluating anything, so it needs no `rl` group. It groups the runs by
 condition, the folder holding the `s<seed>` runs, and writes one row per
 condition and step to `runs/summary.csv`: the number of seeds evaluated at

@@ -4,11 +4,13 @@ from pathlib import Path
 from typing import Final
 
 RUNS_DIR: Final[Path] = Path("runs")
-MODEL_NAME: Final[str] = "model"  # model.zip, plus model_<steps>_steps.zip snapshots
+MODEL_NAME: Final[str] = "model"  # Final model, model.zip
 MODEL_FILE: Final[str] = MODEL_NAME + ".zip"
+MODELS_DIR: Final[str] = "models"  # Snapshots, <steps>.zip
+EVALUATIONS_DIR: Final[str] = "evaluations"  # Evaluation of each snapshot, <steps>.json
 CONFIG_FILE: Final[str] = "config.json"
 PROGRESS_FILE: Final[str] = "progress.csv"
-EVALUATION_NAME: Final[str] = "evaluation"  # One JSON per evaluated model file
+EVALUATION_NAME: Final[str] = "evaluation"  # evaluation.json of the random policy
 RANDOM_RUN: Final[str] = "random"  # Folder for the random policy's evaluation
 SUMMARY_FILE: Final[str] = "summary.csv"  # Every condition by step, under RUNS_DIR
 
@@ -36,8 +38,9 @@ def model_path(name: str, steps: int | None = None) -> Path:
     Returns:
         The model file to load.
     """
-    file = MODEL_FILE if steps is None else f"{MODEL_NAME}_{steps}_steps.zip"
-    return RUNS_DIR / name / file
+    if steps is None:
+        return RUNS_DIR / name / MODEL_FILE
+    return RUNS_DIR / name / MODELS_DIR / f"{steps}.zip"
 
 
 def evaluation_path(name: str, steps: int | None = None) -> Path:
@@ -48,10 +51,11 @@ def evaluation_path(name: str, steps: int | None = None) -> Path:
         steps: Step count of the snapshot, or None for the random policy.
 
     Returns:
-        evaluation.json, or evaluation_<steps>_steps.json for a snapshot.
+        evaluation.json, or evaluations/<steps>.json for a snapshot.
     """
-    suffix = "" if steps is None else f"_{steps}_steps"
-    return RUNS_DIR / name / f"{EVALUATION_NAME}{suffix}.json"
+    if steps is None:
+        return RUNS_DIR / name / f"{EVALUATION_NAME}.json"
+    return RUNS_DIR / name / EVALUATIONS_DIR / f"{steps}.json"
 
 
 def snapshot_steps(name: str) -> list[int]:
@@ -61,11 +65,9 @@ def snapshot_steps(name: str) -> list[int]:
         name: Run name, from run_name.
 
     Returns:
-        The step counts, from the model_<steps>_steps.zip files.
+        The step counts, from the models/<steps>.zip files.
     """
-    prefix, suffix = f"{MODEL_NAME}_", "_steps.zip"
-    files = (RUNS_DIR / name).glob(f"{prefix}*{suffix}")
-    return sorted(int(f.name.removeprefix(prefix).removesuffix(suffix)) for f in files)
+    return sorted(int(f.stem) for f in (RUNS_DIR / name / MODELS_DIR).glob("*.zip"))
 
 
 def evaluated_steps(name: str) -> list[int]:
@@ -75,8 +77,7 @@ def evaluated_steps(name: str) -> list[int]:
         name: Run name, from run_name.
 
     Returns:
-        The step counts, from the evaluation_<steps>_steps.json files.
+        The step counts, from the evaluations/<steps>.json files.
     """
-    prefix, suffix = f"{EVALUATION_NAME}_", "_steps.json"
-    files = (RUNS_DIR / name).glob(f"{prefix}*{suffix}")
-    return sorted(int(f.name.removeprefix(prefix).removesuffix(suffix)) for f in files)
+    files = (RUNS_DIR / name / EVALUATIONS_DIR).glob("*.json")
+    return sorted(int(f.stem) for f in files)
