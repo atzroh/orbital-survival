@@ -16,7 +16,7 @@ from typing import Any
 
 import torch
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import CheckpointCallback
+from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.logger import (
@@ -255,6 +255,46 @@ def appending_csv(path: Path) -> CSVOutputFormat:
     return csv
 
 
+class GridCheckpoint(BaseCallback):
+    """Save a snapshot each time the step count passes a multiple of `every`.
+
+    Names stay on that grid even when a resumed run starts off it.
+    """
+
+    def __init__(self, run: str, every: int, loud: bool) -> None:
+        """Set up the callback.
+
+        Args:
+            run: Run name, from run_name.
+            every: Steps between snapshots.
+            loud: Print a line per snapshot.
+        """
+        super().__init__()
+        self.run = run
+        self.every = every
+        self.loud = loud
+        self.next = every
+
+    def _on_training_start(self) -> None:
+        """Aim at the first grid point past the starting step count."""
+        self.next = (self.model.num_timesteps // self.every + 1) * self.every
+
+    def _on_step(self) -> bool:
+        """Save a snapshot named after the grid point just passed.
+
+        Returns:
+            True to keep training.
+        """
+        steps = self.model.num_timesteps
+        if steps >= self.next:
+            path = model_path(self.run, self.next)
+            self.model.save(path)
+            if self.loud:
+                print(f"Saving model checkpoint to {path}", flush=True)
+            self.next = (steps // self.every + 1) * self.every
+        return True
+
+
 def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> str:
     """Train and save one seed's model; run in a worker process.
 
@@ -322,15 +362,10 @@ def train_seed(args: argparse.Namespace, seed: int, quiet: bool) -> str:
             ],
         )
     )
-    # save_freq counts calls to the vectorized env, each --num-envs steps.
-    checkpoint = CheckpointCallback(
-        save_freq=max(args.checkpoint_every // args.num_envs, 1),
-        save_path=str(run_dir),
-        name_prefix=MODEL_NAME,
-        verbose=2 if quiet else 0,  # A line per snapshot in place of the table
-    )
+    # A line per snapshot in place of the table when quiet.
+    checkpoint = GridCheckpoint(run_name(args.name, seed), args.checkpoint_every, quiet)
     print(f"{tag}Training in {run_dir}", flush=True)
-    # Without a reset the step count, and so checkpoint names, carry on.
+    # Without a reset the step count carries on.
     model.learn(
         total_timesteps=args.timesteps - start,
         callback=checkpoint,

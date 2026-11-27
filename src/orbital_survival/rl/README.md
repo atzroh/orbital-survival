@@ -150,9 +150,10 @@ step count, and the logs carry on too: `progress.csv` gets the new rows under
 the same header, and TensorBoard draws one continuous curve.
 
 PPO trains in whole rollouts, so a 5M-step run ends at 5,001,216 steps, and
-`model.zip` keeps them all. A run resumed from it counts snapshots from there,
-so their names leave the `--checkpoint-every` grid (5,101,216, ...), unlike a
-run trained in one go.
+`model.zip` keeps them all. Snapshots are still saved as the step count passes
+each multiple of `--checkpoint-every` (5,100,000, ...), so their names stay on
+that grid as in a run trained in one go. With `--num-envs` that does not divide
+`--checkpoint-every`, a snapshot may hold a few steps more than its name.
 
 Models trained with `--linear-lr` are not meant to be resumed. The saved
 schedule is recomputed against the new total, so resuming a finished 1M-step
